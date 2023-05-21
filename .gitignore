@@ -1,0 +1,23 @@
+# Igoring venv folder
+env/
+
+# Ignoring test & play scripts
+test_*.py
+play_*.py
+
+# Ignoring pics
+*.png
+
+# Ignoring secrets & env vars
+secrets/
+.env
+
+# Ignoring garbage
+__pycache__/
+
+# Ignoring IDE stuff
+.vscode/
+
+# Ignoring logs coz they are heavy
+logs/*
+*.log

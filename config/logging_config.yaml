@@ -1,0 +1,29 @@
+version: 1
+
+disable_existing_loggers: False
+
+formatters:
+  verbose:
+    format: "[%(levelname)-10s :: %(asctime)s :: %(module)-15s]\t %(message)s"
+
+# Add queuelistener handler here
+handlers:
+  console:
+    level: "DEBUG"
+    class: "logging.StreamHandler"
+    formatter: verbose
+  file:
+    level: "INFO"
+    class: "logging.FileHandler"
+    filename: logs/alfredo.log
+    formatter: "verbose"
+    mode: "a" # This should append to the file
+
+loggers:
+  alfredo_logger:
+    level: "INFO"
+    handlers:
+      - "console"
+      - "file"
+    propagate: False
+    

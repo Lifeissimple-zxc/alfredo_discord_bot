@@ -27,3 +27,6 @@ logs/*
 
 # Ignoring csvs if any
 *.csv
+
+# Ignoring contents of cache
+cache/**

@@ -1,0 +1,7 @@
+# TODO ENV differences
+cache_path: "cache/cache.db"
+
+command_prefix: "!"
+
+error_messages:
+  missing_input: "Missing mandatory arguments. Check help and try again"

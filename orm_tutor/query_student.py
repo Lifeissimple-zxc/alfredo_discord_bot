@@ -51,3 +51,22 @@ students = (sesh.
 for s in students:
     print(s.id, s.name, s.age, s.grade)
 # Count result rows
+print("\nCount rows in result")
+# https://www.youtube.com/watch?v=9xkfCo5StAk&list=PL4iRawDSyRvVd1V7A45YtAGzDk6ljVPm1&index=4
+students = (sesh.query(Student).filter(Student.name=="Glush")).count()
+print(students)
+
+# Update queries
+# Get our data
+# student = sesh.query(Student).filter(Student.name=="Glush").first()
+# # Update part of the data
+# student.name = "Jamie"
+# sesh.commit()
+
+# # Delete queries
+# # Get the needed record
+# student = sesh.query(Student).filter(Student.name=="Makarik").first()
+# # Delete record
+# sesh.delete(student)
+# # Commit to db
+# sesh.commit()

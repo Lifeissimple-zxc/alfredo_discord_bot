@@ -1,11 +1,14 @@
 import discord
 import logging.config
 from discord.ext import commands
+from cogs.greetings import Greetings
 from alfredo_lib import (
     LOGGING_CONFIG,
-    ENV_VARS
+    ENV_VARS,
+    CMDS_DIR,
+    COGS_DIR
 )
-# Continue fromhttps://www.youtube.com/watch?v=oYci7dtCT7c&list=PLESMQx4LeD3N0-KKPPDaToZhBsom2E_Ju&index=8
+# Continue from https://www.youtube.com/watch?v=ynD_dffUzrg&list=PLESMQx4LeD3N0-KKPPDaToZhBsom2E_Ju&index=14
 # Boilerplate for logging config
 logging.config.dictConfig(LOGGING_CONFIG)
 bot_logger = logging.getLogger("alfredo_logger")
@@ -24,6 +27,21 @@ def run_bot():
     async def on_ready():
         bot_logger.info(f"User: {bot.user} (ID: {bot.user.id})")
 
+        # Add our commands from a separate file
+        for cmd_file in CMDS_DIR.glob("*.py"):
+            # Ignore inits
+            if ((cmd_name := cmd_file.name) == "__init__.py"):
+                continue
+            # Load the file ignoring last 3 .py chars in name
+            await bot.load_extension(f"cmd_test.{cmd_name[:-3]}")
+
+        # Bulk load our cogs
+        for cog_file in COGS_DIR.glob("*.py"):
+            # Ignore inits
+            if ((cog_name := cog_file.name) == "__init__.py"):
+                continue
+            await bot.load_extension(f"cogs.{cog_name[:-3]}")
+
     @bot.event
     async def on_command_error(ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
@@ -41,6 +59,11 @@ def run_bot():
         Answers with pong
         """
         await ctx.send("pong")
+
+    # Ping that replies to a DM
+    @bot.command()
+    async def ping_dm(ctx: commands.Context):
+        await ctx.message.author.send("PONG!")
         
     @bot.command()
     async def test(ctx):
@@ -59,10 +82,6 @@ def run_bot():
     async def say_words(ctx, *what):
         await ctx.send(" ".join(what))
 
-    # Command with type conversion and returning input to the user
-    @bot.command()
-    async def multi(ctx, num_one: float, num_two: float):
-        await ctx.send(num_one * num_two)
 
     # Command for sending a brief summary about the user
     # Using a type hint allows us to access user data
@@ -94,11 +113,33 @@ def run_bot():
     #     elif isinstance(error, commands.MissingRequiredArgument):
     #         await ctx.send("You did not provide any input, WHY?")
 
+    # Command to reload the bot (partially)?
+    @bot.command()
+    async def reload(ctx, cog: str):
+        await bot.reload_extension(f"cogs.{cog.lower()}")
 
+    @bot.command()
+    async def unload(ctx, cog: str):
+        await bot.unload_extension(f"cogs.{cog.lower()}")
     
+    @bot.command()
+    async def load(ctx, cog: str):
+        await bot.load_extension(f"cogs.{cog.lower()}")
 
-    
-
+    # Command with a permission
+    async def is_owner(ctx):
+        return ctx.author.id
+    @bot.command()
+    @commands.check(is_owner)
+    async def say_admin(ctx, what: str=None):
+        if what is None:
+            what = "WHAT"
+        await ctx.send(what)
+    # Erorr handler for permission related errors
+    @say_admin.error
+    async def say_admin_error(ctx: commands.Context, error):
+        if isinstance(error, commands.CommandError):
+            await ctx.send("Permission denied")
 
     bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)
 

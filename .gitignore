@@ -21,3 +21,9 @@ __pycache__/
 # Ignoring logs coz they are heavy
 logs/*
 *.log
+
+# Ignoring orm_tutor db
+*.db
+
+# Ignoring csvs if any
+*.csv

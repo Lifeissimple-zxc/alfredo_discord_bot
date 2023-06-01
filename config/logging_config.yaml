@@ -21,7 +21,7 @@ handlers:
 
 loggers:
   alfredo_logger:
-    level: "INFO"
+    level: "DEBUG"
     handlers:
       - "console"
       - "file"

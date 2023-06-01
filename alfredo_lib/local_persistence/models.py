@@ -28,3 +28,4 @@ class User(Base):
     timezone = Column(String(50))
     created = Column(Integer, nullable=False)
     currency = Column(String(10))
+    spreadsheet = Column(String(50))

@@ -154,6 +154,7 @@ class Cache:
         """
         Parses user ORM row to a dict
         """
+        # Make several modes: dict and string
         bot_logger.debug("Parsing user data to a dict")
         user_dict = {}
         cols = user.__class__.__table__.columns

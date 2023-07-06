@@ -1,14 +1,12 @@
 import logging
 import queue
-from requests import session
-from time import time
+from retry import retry
+from typing import List, Dict
+from requests import session, RequestException
 from atexit import register
 from logging.handlers import QueueHandler, QueueListener, TimedRotatingFileHandler
 from logging.config import ConvertingList
-from logging import (
-    Handler,
-    LogRecord
-)
+from logging import LogRecord
 
 # Constants
 LEVEL_MAP = {"CRITICAL": 50, "ERROR": 40, "WARNING": 30,
@@ -21,7 +19,7 @@ class QueueListenerHandler(QueueHandler):
     Inspired by my colleagues from Uber and the below medium article:
     https://rob-blackbourn.medium.com/how-to-use-python-logging-queuehandler-with-dictconfig-1e8b1284e27a
     """
-    def __init__(self, handlers: list, queue: queue.Queue,
+    def __init__(self, handlers: List, queue: queue.Queue,
                  autorun: bool=None, respect_handler_level: bool=None):
         """
         ### Constructor of the class. Attaches a list of handlers to a queue.
@@ -52,7 +50,7 @@ class QueueListenerHandler(QueueHandler):
             register(self.listener.stop)
     
     @staticmethod
-    def __convert_handlers(handlers: list) -> list:
+    def __convert_handlers(handlers: List) -> List:
         """
         ### Helper method to parse handlers.
         Iterates of the list of handlers and returns it.
@@ -83,9 +81,10 @@ class QueueListenerHandler(QueueHandler):
         """
         return super().emit(record=record)
 
+
 class LevelFilter(logging.Filter):
     """
-    ### QueueListener does not do level filtering by default, this class takes care of it.
+    ### QueueListener does not do level filtering by default, this class does it.
     """
     def __init__(self, level: str, strict: bool=None):
         """
@@ -109,24 +108,157 @@ class LevelFilter(logging.Filter):
         ### Actually performs filtering
         :param record: LogRecord we want to handle
         """
+        # Looser check by default
+        allow = (record.levelno >= self.level)
+        # Override for strict setup when needed
         if self.strict:
-            # Make sure only the specific level goes through
             allow = (self.level == record.levelno)
-        else:
-            # Looser check
-            allow = (record.levelno >= self.level)
+
         return allow
+
+        
+class AttributeFilter(logging.Filter):
+    """
+    Class for filtering based on at attribute of a LogRecord
+    """
+    def __init__(self, attr_name: str, allow_val: bool, default_val: bool):
+        """
+        :param attr_name: name of the attribute to use for filtering
+        :param allow_val: value that greenlights filtering
+        :param default_val: default value of the attribute
+        """
+        super().__init__()
+        self.attr_name = attr_name
+        self.allow_val = allow_val
+        self.default_val = default_val
+
+    def filter(self, record: LogRecord) -> bool:
+        """
+        ### Performs filtering a record
+        :param record: LogRecord to filter
+        """
+        return getattr(record, self.attr_name, self.default_val) == self.allow_val
+
+
+class DiscordHandler(logging.Handler):
+    """
+    Class handles logging to a Discord channel
+    """
+    def __init__(self, wbhk: str, users_to_tag: List[str],
+                 project: str = None, max_chars: int = None,
+                 autoflush: bool = None, warn_str: str = None):
+        """
+        :param wbhk: webhook of the channel where the log messages are to be sent
+        :param users_to_tag: string of user id to tag in the message
+        :param max_chars: max len of a message, 2000k is the default
+        """
+        # Inherit and construct the class
+        super().__init__()
+        # Default values
+        self.max_chars = max_chars or 2000
+        self.autoflush = autoflush or True
+        self.warn_str = warn_str or ":warning:"
+        # Other attributes
+        self.sesh = session()
+        self.wbhk = wbhk
+        self.project = project or ""
+        self.users_to_tag = self._create_usr_tag_str(users_to_tag)
+        # Register session closure to be done at the exit
+        register(self.sesh.close)
+
+    @staticmethod
+    def _create_usr_tag_str(users_to_tag: List[str]) -> str:
+        """
+        ### Converts users_to_tag to a tagging string
+        """
+        tag_str = [f"<@{user}>" for user in users_to_tag]
+        return " ".join(tag_str)
+        
+    def _format_level(self, record: LogRecord) -> str:
+        """
+        ### Generates a wrapper string depending on the level of the record
+        https://docs.python.org/3/library/logging.html#logging-levels
+        :return: string that will preceed the messsage
+        """
+        repts = (record.levelno - 20) // 10
+        # No wrapper string for INFO and lower
+        wrapper = ""
+        if repts > 0:
+            wrapper = repts * self.warn_str
+        return wrapper
+    
+    def _truncate_message(self, msg: str, buffer: int = None) -> str:
+        """
+        ### Truncates the log messages to fit within the self.max_chars limit
+        :param msg: message to be sent to discord
+        :param buffer: extra characters to remove from the msg, defaults to 0
+        :return: truncated message to be sent to discord
+        """
+        if buffer is None:
+            buffer = 0
+        truncated = msg
+        if (len(msg) + buffer) > self.max_chars:
+            truncated = msg[:self.max_chars - buffer - 1]
+        return truncated
+    
+    def _prepare_message(self, record: LogRecord) -> str:
+        """
+        ### Method performs all the steps for formatting record to a discord message str
+        """
+        log_msg = record.getMessage()
+        # Add project name if any
+        if self.project != "":
+            log_msg = f"*{self.project}*: {log_msg}"
+        # Handle wrapping for severe messages
+        log_msg = f"{self._format_level(record)} {log_msg}"
+        # Truncate
+        log_msg = self._truncate_message(log_msg, buffer=len(self.users_to_tag))
+        # Add people to tag
+        log_msg += f" {self.users_to_tag}"
+
+    def _prepare_request(self, record: LogRecord) -> Dict:
+        """
+        ### Prepares payload for sending log message to discord
+        :param record: LogRecord we want to handle
+        """
+        full_msg = self._prepare_message(record)
+
+        return {"content": full_msg}
+    
+    @retry(exceptions=RequestException, tries=10, delay=0.5, jitter=(0.5, 3))
+    def _log_to_discord(self, record: LogRecord):
+        """
+        ### Sends log to discord using other lower-level methods of the class
+        :param record: LogRecord we want to handle
+        """
+        data = self._prepare_request(record)
+        try:
+            resp = self.sesh.post(url=self.wbhk, data=data)
+            # Check if we should retry
+            if not 200 <= resp.status_code < 300:
+                # Triggers decorator
+                raise RequestException
+        # TODO change prints here to a backup logger
+        except RequestException as e:
+            print(f"Failed to log to discord despite retries: {e}")
+        except Exception as e:
+            print(f"Uncaught exception when logging to discord: {e}")
+    
+    def handle(self, record: LogRecord):
+        """
+        ### Actually performs the logging to discord. Relient on lower-level methods.
+        :param record: LogRecord we want to handle
+        """
+        self._log_to_discord(record)
+            
+
+
+            
 
         
 
 
 
-# class AttributeFilter:
-#     pass
-
-
-# class DiscordHandler:
-#     pass
 
 # class DbHandler:
 #     pass

@@ -47,7 +47,7 @@ handlers:
       - "DiscordFilter"
   DbHandler:
     (): "alfredo_lib.alfredo_logger.DbHandler"
-    cache_instance: "ext://play_test_logging.alfredo_deps.cache"
+    cache_instance: "ext://alfredo_lib.alfredo_deps.cache"
   BackupFileHandler:
     (): "alfredo_lib.alfredo_logger.BackupFileHandler"
     folder: "./logs"

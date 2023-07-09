@@ -5,23 +5,21 @@ from typing import List, Dict
 from requests import session, RequestException
 from atexit import register
 from pathlib import Path
-from queue import Queue
 
 from logging.handlers import QueueHandler, QueueListener, TimedRotatingFileHandler
 from logging.config import ConvertingList
 from logging import LogRecord
 
 from alfredo_lib.local_persistence.cache import Cache
-from alfredo_lib.alfredo_deps import (
-    backup_logger
+from alfredo_lib import (
+    ENV_VARS, ENV, MAIN_CFG
 )
-from alfredo_lib import ENV_VARS, ENV, MAIN_CFG
 
 # Constants
 LEVEL_MAP = {"CRITICAL": 50, "ERROR": 40, "WARNING": 30,
              "INFO": 20, "DEBUG": 10, "NOTSET": 0}
-_LOG_QUEUE = Queue() # This is referred to in logging config yaml
-
+_LOG_QUEUE = queue.Queue() # This is referred to in logging config yaml
+backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
 
 class QueueListenerHandler(QueueHandler):
     """
@@ -49,11 +47,7 @@ class QueueListenerHandler(QueueHandler):
         # Transform datatypes for handlers
         handlers = self.__convert_handlers(handlers=handlers)
         # Save listener within self
-        self.listener = QueueListener(
-            queue=queue,
-            respect_handler_level=respect_handler_level,
-            *handlers
-        )
+        self.listener = QueueListener(queue, *handlers, respect_handler_level)
         # Avoid the need to start the logging queue manually
         if autorun:
             self.listener.start()
@@ -90,7 +84,7 @@ class QueueListenerHandler(QueueHandler):
         Performs logging
         :param record: LogRecord we want to handle
         """
-        return super().emit(record=record)
+        return super().emit(record)
 
 
 class LevelFilter(logging.Filter):

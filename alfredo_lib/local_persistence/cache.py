@@ -1,4 +1,5 @@
 import re
+import logging
 from pathlib import Path
 from time import time
 from alfredo_lib.local_persistence.models import (
@@ -12,14 +13,14 @@ from sqlalchemy import (
     create_engine
 )
 from sqlalchemy.exc import IntegrityError
-from alfredo_lib.alfredo_deps import (
-    bot_logger,
-    backup_logger
-)
 from alfredo_lib import (
-    logging
+    MAIN_CFG
 )
 from typing import Union
+
+# Get loggers
+bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
+backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
 
 # This is an ORM that is responsible for all the operations with the local sqlite3 db.
 # It needs to support the following functions:
@@ -137,7 +138,7 @@ class Cache:
 
         bot_logger.debug(f"Prepared user data for {username} reg.")
         # Add to db (this also rollbacks in case of errors)
-        res = self._add_new_row()
+        res = self._add_new_row(user_row)
         # Save path w/o issues
         if res is None:
             user_msg = f"{username} registered"

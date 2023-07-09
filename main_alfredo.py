@@ -5,7 +5,7 @@ from alfredo_lib.alfredo_deps import (
     cache,
     bot_logger
 )
-from alfredo_lib import (
+from alfredo_lib.alfredo_deps import (
     ENV_VARS,
     MAIN_CFG
 )

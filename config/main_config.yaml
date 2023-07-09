@@ -3,6 +3,8 @@ cache_path: "cache/cache.db"
 
 command_prefix: "!"
 
+logging_config: "config/logging_config.yaml"
+
 error_messages:
   missing_input: "Missing mandatory arguments. Check !help and try again"
 

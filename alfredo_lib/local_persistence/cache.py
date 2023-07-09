@@ -1,21 +1,26 @@
 import re
+import logging
 from pathlib import Path
 from time import time
 from alfredo_lib.local_persistence.models import (
     Base,
-    User
+    User,
+    LogRecordRow
 )
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Engine, ResultProxy
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import (
     create_engine
 )
 from sqlalchemy.exc import IntegrityError
 from alfredo_lib import (
-    logging
+    MAIN_CFG
 )
+from typing import Union
 
-bot_logger = logging.getLogger("alfredo_logger")
+# Get loggers
+bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
+backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
 
 # This is an ORM that is responsible for all the operations with the local sqlite3 db.
 # It needs to support the following functions:
@@ -33,6 +38,7 @@ class Cache:
         """
         self.db_path_raw = db_path
         self.users_table = User
+        self.logs_table = LogRecordRow
         self.engine = self._create_engine(db_path)
         # TODO Check if the below two lines can be merged?
         Session = sessionmaker(bind=self.engine)
@@ -75,6 +81,40 @@ class Cache:
         """
         return int(time() * 1000)
     
+    def _construct_table_row(self, dst_attr_name: str, **kwargs) -> tuple:
+        """
+        ### Lower-level abstraction to write new rows to local sqlite
+        :param dst_attr_name: name of the attribute stored within self.
+        :return: tuple(sqlalchemy row, error if any)
+        """
+        # First, check if dst_attr_name is valid
+        table = getattr(self, dst_attr_name, None)
+        if table is None:
+            msg = f"Local cache does not have {dst_attr_name} attr."
+            return None, AttributeError(msg)
+        # Getting here means we can actually add our row
+        try:
+            new_row = table(created=self._generate_ts(), **kwargs)
+        except Exception as e:
+            return None, e
+        
+        bot_logger.debug(f"Prepared new row for {dst_attr_name}: {kwargs}")
+        return new_row, None
+    
+    def _add_new_row(self, row_struct: ResultProxy) -> Union[Exception, None]:
+        """
+        Adds row_struct to the corresponding table
+        :param row_struct: sqlalchemy row object
+        :return: error if any
+        """
+        # Add to db
+        try:
+            self.sesh.add(row_struct)
+            self.sesh.commit()
+        except Exception as e:
+            self.sesh.rollback()
+            return e
+
     def create_user(self, username: str, discord_id: int) -> tuple:
         """
         ### Creates a new user entry in the local db
@@ -85,37 +125,41 @@ class Cache:
         # TODO exceptions? have no idea what might occur here
         # sqlite3.IntegrityError when unique constraint fails
         # Prepare user data from input
-        bot_logger.debug(discord_id)
-        user_row = self.users_table(username=username,
-                                    discord_id=discord_id,
-                                    created=self._generate_ts())
-        bot_logger.debug(f"Prepared user data for {username} reg")
-        # Add to db
-        try:
-            self.sesh.add(user_row)
-            self.sesh.commit()
+        user_row, e = self._construct_table_row(dst_attr_name="users_table",
+                                                username=username,
+                                                discord_id=discord_id)
+        # Check for row struct creation errors
+        if e is not None:
+            user_msg = f"Internal data error: {e}"
+            # Specify msg in case we have attr error
+            if isinstance(e, AttributeError):
+                user_msg = "Internal data error: users data does not exit on server."
+            return user_msg, e
+
+        bot_logger.debug(f"Prepared user data for {username} reg.")
+        # Add to db (this also rollbacks in case of errors)
+        res = self._add_new_row(user_row)
+        # Save path w/o issues
+        if res is None:
+            user_msg = f"{username} registered"
+            bot_logger.debug(user_msg)
+            return user_msg, None
         
-        except IntegrityError as e:
-            # Firstly, we rollback or DB will trigger more exceptions
-            self.sesh.rollback()
+        # Handle exceptions if we got any
+        if isinstance(res, IntegrityError):
             # Parse what column is causing the issue
             table, col = self.__parse_integrity_err_col(e)
             bot_logger.error(f"DB Constraint violated for {table}.{col}: {e}")
+        
             if col == "username":
                 user_msg = "username is already taken"
             else:
                 user_msg = "You are already registered"
-            return user_msg, e
-
-        except Exception as e:
-            user_msg = f"uncaught exception. Details: {e}"
+            return user_msg, e     
+        else:
+            user_msg = f"Unexpected internal error. Details: {e}"
             bot_logger.error(user_msg)
             return user_msg, e
-        
-        else:
-            user_msg = f"{username} registered"
-            bot_logger.debug(user_msg)
-            return user_msg, None
     
     @staticmethod
     def __parse_integrity_err_col(e: IntegrityError):
@@ -178,6 +222,26 @@ class Cache:
         # Parse user data to dict
         user_data = self.__parse_user_row(user)
         return user_data, None
+    
+    def add_log_row(self, record: logging.LogRecord):
+        """
+        ### Writes record to a local logs table
+        :param record: LogRecord from a logging call
+        """
+        log_row, e = self._construct_table_row(dst_attr_name="logs_table",
+                                               user_id=getattr(record, "user_id", None),
+                                               message=record.getMessage(),
+                                               level=record.levelname,
+                                               func_name=record.funcName)
+        # Some TODO
+        # Change prints with backup logger here
+        # Mb add calls to a timeseries db here to track error and get alerted on them
+        if e is not None:
+            backup_logger.error(f"Logging to DB failed on row creation: {e}")
+
+        res = self._add_new_row(log_row)
+        if res is not None:
+            backup_logger.error(f"Adding new DB row failed: {e}")
 
         
 

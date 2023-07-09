@@ -3,27 +3,76 @@ version: 1
 disable_existing_loggers: False
 
 formatters:
-  verbose:
-    format: "[%(levelname)-10s :: %(asctime)s :: %(module)-15s]\t %(message)s"
+  main:
+    format: "[%(asctime)s - %(levelname)s - %(funcName)s()]\t %(message)s"
+
+filters:
+  DiscordErrorFilter:
+    (): "alfredo_lib.alfredo_logger.LevelFilter"
+    level: "WARNING"
+  DiscordFilter:
+    (): "alfredo_lib.alfredo_logger.AttributeFilter"
+    attr_name: "toDs"
+    allow_val: True
+    default_val: False
+  DiscordSilencer:
+    (): "alfredo_lib.alfredo_logger.AttributeFilter"
+    attr_name: "IgnoreDs"
+    allow_val: False
+    default_val: False
+  DbFilter:
+    (): "alfredo_lib.alfredo_logger.AttributeFilter"
+    attr_name: "toDb"
+    allow_val: True
+    default_val: False
+
 
 # Add queuelistener handler here
 handlers:
-  console:
-    level: "DEBUG"
+  ZZZQListenerHandler:
+    (): "alfredo_lib.alfredo_logger.QueueListenerHandler"
+    queue: "ext://alfredo_lib.alfredo_logger._LOG_QUEUE"
+    handlers:
+      - "cfg://handlers.DiscordErrorHandler"
+      - "cfg://handlers.DiscordHandler"
+      - "cfg://handlers.DbHandler"
+  DiscordErrorHandler:
+    class: "alfredo_lib.alfredo_logger.DiscordHandler"
+    filters:
+      - "DiscordErrorFilter"
+      - "DiscordSilencer"
+  DiscordHandler:
+    class: "alfredo_lib.alfredo_logger.DiscordHandler"
+    filters:
+      - "DiscordFilter"
+  DbHandler:
+    (): "alfredo_lib.alfredo_logger.DbHandler"
+    cache_instance: "ext://alfredo_lib.alfredo_deps.cache"
+    filters:
+      - "DbFilter"
+  BackupFileHandler:
+    (): "alfredo_lib.alfredo_logger.BackupFileHandler"
+    folder: "./logs"
+    file: "alfredo_log.log"
+    formatter: "main"
+  StreamHandler:
     class: "logging.StreamHandler"
-    formatter: verbose
-  file:
-    level: "INFO"
-    class: "logging.FileHandler"
-    filename: logs/alfredo.log
-    formatter: "verbose"
-    mode: "a" # This should append to the file
+    formatter: "main"
+
 
 loggers:
   alfredo_logger:
     level: "DEBUG"
     handlers:
-      - "console"
-      - "file"
+      - "ZZZQListenerHandler"
+      - "StreamHandler"
     propagate: False
+  backup_logger:
+    level: "DEBUG"
+    handlers:
+      - "ZZZQListenerHandler"
+      - "StreamHandler"
+      - "BackupFileHandler"
+    propagate: False
+
     

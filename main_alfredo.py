@@ -1,17 +1,14 @@
 import discord
-from alfredo_lib.local_persistence.cache import Cache
 from discord.ext import commands
+# Dependencies referred by logging and other modules
+from alfredo_lib.alfredo_deps import (
+    cache,
+    bot_logger
+)
 from alfredo_lib import (
-    logging,
     ENV_VARS,
     MAIN_CFG
 )
-
-
-bot_logger = logging.getLogger("alfredo_logger")
-# Useful classes
-cache = Cache(MAIN_CFG["cache_path"])
-
 
 def run_alfredo():
     """

@@ -29,3 +29,14 @@ class User(Base):
     created = Column(Integer, nullable=False)
     currency = Column(String(10))
     spreadsheet = Column(String(50))
+
+class LogRecordRow(Base):
+    # Dst table for all log records
+    __tablename__ = "logs"
+    # Logging datapoints
+    internal_id = Column(Integer, primary_key=True)
+    created = Column(Integer, nullable=False)
+    user_id = Column(Integer) # Can be null in some cases
+    message = Column(String(300), nullable=False)
+    level = Column(String(30), nullable=False)
+    func_name = Column(String(30), nullable=False)

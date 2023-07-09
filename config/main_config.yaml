@@ -4,4 +4,15 @@ cache_path: "cache/cache.db"
 command_prefix: "!"
 
 error_messages:
-  missing_input: "Missing mandatory arguments. Check help and try again"
+  missing_input: "Missing mandatory arguments. Check !help and try again"
+
+discord:
+  project: "ALFREDO BOT"
+  users_to_tag:
+    PROD:
+      - "194543162604126208"
+    LOCAL: 
+      - "194543162604126208"
+
+main_logger_name: "alfredo_logger"
+backup_logger_name: "backup_logger"

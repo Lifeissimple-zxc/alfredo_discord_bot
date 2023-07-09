@@ -4,13 +4,24 @@ from retry import retry
 from typing import List, Dict
 from requests import session, RequestException
 from atexit import register
+from pathlib import Path
+from queue import Queue
+
 from logging.handlers import QueueHandler, QueueListener, TimedRotatingFileHandler
 from logging.config import ConvertingList
 from logging import LogRecord
 
+from alfredo_lib.local_persistence.cache import Cache
+from alfredo_lib.alfredo_deps import (
+    backup_logger
+)
+from alfredo_lib import ENV_VARS, ENV, MAIN_CFG
+
 # Constants
 LEVEL_MAP = {"CRITICAL": 50, "ERROR": 40, "WARNING": 30,
              "INFO": 20, "DEBUG": 10, "NOTSET": 0}
+_LOG_QUEUE = Queue() # This is referred to in logging config yaml
+
 
 class QueueListenerHandler(QueueHandler):
     """
@@ -144,9 +155,10 @@ class DiscordHandler(logging.Handler):
     """
     Class handles logging to a Discord channel
     """
-    def __init__(self, wbhk: str, users_to_tag: List[str],
-                 project: str = None, max_chars: int = None,
-                 autoflush: bool = None, warn_str: str = None):
+    def __init__(self, wbhk: str = ENV_VARS[f"DISCORD_LOGGING_WEBHOOK_{ENV}"],
+                 users_to_tag: List[str] = MAIN_CFG["discord"]["users_to_tag"][ENV],
+                 project: str = MAIN_CFG["discord"]["project"],
+                 max_chars: int = None, autoflush: bool = None, warn_str: str = None):
         """
         :param wbhk: webhook of the channel where the log messages are to be sent
         :param users_to_tag: string of user id to tag in the message
@@ -161,7 +173,7 @@ class DiscordHandler(logging.Handler):
         # Other attributes
         self.sesh = session()
         self.wbhk = wbhk
-        self.project = project or ""
+        self.project = project
         self.users_to_tag = self._create_usr_tag_str(users_to_tag)
         # Register session closure to be done at the exit
         register(self.sesh.close)
@@ -238,13 +250,12 @@ class DiscordHandler(logging.Handler):
             if not 200 <= resp.status_code < 300:
                 # Triggers decorator
                 raise RequestException
-        # TODO change prints here to a backup logger
         except RequestException as e:
-            print(f"Failed to log to discord despite retries: {e}")
+            backup_logger.error(f"Failed to log to discord despite retries: {e}")
         except Exception as e:
-            print(f"Uncaught exception when logging to discord: {e}")
+            backup_logger.error(f"Uncaught exception when logging to discord: {e}")
     
-    def handle(self, record: LogRecord):
+    def emit(self, record: LogRecord):
         """
         ### Actually performs the logging to discord. Relient on lower-level methods.
         :param record: LogRecord we want to handle
@@ -252,13 +263,47 @@ class DiscordHandler(logging.Handler):
         self._log_to_discord(record)
             
 
+class DbHandler(logging.Handler):
+    """
+    Handles writing log records to a local sqlite db
+    """
+    def __init__(self, cache_instance: Cache):
+        """
+        Stores an instance of Cahce within self. This instance interacts with the db.
+        """
+        super().__init__()
+        self.__cache_instance = cache_instance
 
-            
+    def emit(self, record: LogRecord):
+        """
+        Performs logging to db
+        """
+        self.__cache_instance.add_log_row(record)
 
-        
+
+class BackupFileHandler(TimedRotatingFileHandler):
+    """
+    Backup handler used when rest of the handlers fail.
+    """
+    def __init__(self, folder: str, file: str):
+        """
+        ### Creates folder for log files if it does not exist.
+        ##### Dest files are rotated at midnight UTC.
+        :param folder: name of the folder to store our log files.
+        :param file: name of the log file
+        """
+        log_file_path = Path(folder, file)
+        log_file_dir = log_file_path.parent
+        # Here we create the folder structure for logging files
+        # Fist check if folder exists
+        if log_file_dir.exists():
+            if not log_file_dir.is_dir():
+                # Create it if not a directory
+                log_file_dir.mkdir(parents=True)
+        # We also create if the folder does not exist at all
+        else:
+            log_file_dir.mkdir(parents=True)
+        # Construct our logging class using inheritance
+        super().__init__(filename=log_file_path, when="MIDNIGHT", utc=True)
 
 
-
-
-# class DbHandler:
-#     pass

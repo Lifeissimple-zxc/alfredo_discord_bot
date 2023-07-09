@@ -6,6 +6,7 @@ from pathlib import Path
 from dotenv import dotenv_values
 
 ENV_VARS = dotenv_values(".env")
+ENV = "LOCAL" # TODO shold be coming from CLI args
 
 # Read logging configuration
 with open("config/logging_config.yaml") as _log_cfg:

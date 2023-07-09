@@ -48,6 +48,8 @@ handlers:
   DbHandler:
     (): "alfredo_lib.alfredo_logger.DbHandler"
     cache_instance: "ext://alfredo_lib.alfredo_deps.cache"
+    filters:
+      - "DbFilter"
   BackupFileHandler:
     (): "alfredo_lib.alfredo_logger.BackupFileHandler"
     folder: "./logs"

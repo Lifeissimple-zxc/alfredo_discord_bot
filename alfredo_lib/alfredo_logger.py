@@ -46,13 +46,26 @@ class QueueListenerHandler(QueueHandler):
         super().__init__(queue=queue)
         # Transform datatypes for handlers
         handlers = self.__convert_handlers(handlers=handlers)
-        # Save listener within self
-        self.listener = QueueListener(queue, *handlers, respect_handler_level)
+        self.listener = QueueListener(queue,
+                                      *handlers,
+                                      respect_handler_level)
+        # Due to QueueListener adding a random False to the list, we need to remove it
+        self.__sanitize_listener()
         # Avoid the need to start the logging queue manually
         if autorun:
             self.listener.start()
             # ACHTUNG: we enable the logging queue to flush by using atexit.register
             register(self.listener.stop)
+    
+    def __sanitize_listener(self):
+        """
+        ### Removes bool handler from self.listener
+        """
+        new_handlers = tuple(
+            item for item in self.listener.handlers if not isinstance(item, bool)
+        )
+        self.listener.handlers = new_handlers
+
     
     @staticmethod
     def __convert_handlers(handlers: List) -> List:
@@ -62,11 +75,11 @@ class QueueListenerHandler(QueueHandler):
         :param handlers: List of handlers for logging.
         :return: list of handlers ready to be user by the QueueListener
         """
-        if isinstance(handlers, ConvertingList):
-            # For some reason when not using indexing the loop does not work :(
-            handlers = [handlers[i] for i in range(len(handlers))]
-        return handlers
-    
+        # For some reason when not using indexing the loop does not work :(
+        if not isinstance(handlers, ConvertingList):
+            return handlers
+        return [handlers[i] for i in range(len(handlers))]
+       
     def start(self):
         """
         Starts QueueListener attached to the class
@@ -214,13 +227,15 @@ class DiscordHandler(logging.Handler):
         log_msg = record.getMessage()
         # Add project name if any
         if self.project != "":
-            log_msg = f"*{self.project}*: {log_msg}"
+            log_msg = f"**{self.project}**: {log_msg}"
         # Handle wrapping for severe messages
         log_msg = f"{self._format_level(record)} {log_msg}"
         # Truncate
         log_msg = self._truncate_message(log_msg, buffer=len(self.users_to_tag))
         # Add people to tag
         log_msg += f" {self.users_to_tag}"
+
+        return log_msg
 
     def _prepare_request(self, record: LogRecord) -> Dict:
         """

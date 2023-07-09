@@ -1,5 +1,5 @@
 # TODO ENV differences
-cache_path: "cache/cache.db"
+cache_path: "cache/alfredo_db.sqlite"
 
 command_prefix: "!"
 

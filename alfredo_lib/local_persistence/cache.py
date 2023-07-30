@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import (
     create_engine
 )
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import exc
 from alfredo_lib import (
     MAIN_CFG
 )
@@ -83,7 +83,7 @@ class Cache:
     
     def _construct_table_row(self, dst_attr_name: str, **kwargs) -> tuple:
         """
-        ### Lower-level abstraction to write new rows to local sqlite
+        ### Mapper converting kwargs to an ORM row object of dst_attr_name.
         :param dst_attr_name: name of the attribute stored within self.
         :return: tuple(sqlalchemy row, error if any)
         """
@@ -115,7 +115,7 @@ class Cache:
             self.sesh.rollback()
             return e
 
-    def create_user(self, username: str, discord_id: int) -> tuple:
+    def create_user(self, reg_data: dict) -> tuple:
         """
         ### Creates a new user entry in the local db
         :param username: username for registration
@@ -125,9 +125,8 @@ class Cache:
         # TODO exceptions? have no idea what might occur here
         # sqlite3.IntegrityError when unique constraint fails
         # Prepare user data from input
-        user_row, e = self._construct_table_row(dst_attr_name="users_table",
-                                                username=username,
-                                                discord_id=discord_id)
+        username = reg_data["username"]
+        user_row, e = self._construct_table_row(dst_attr_name="users_table", **reg_data)
         # Check for row struct creation errors
         if e is not None:
             user_msg = f"Internal data error: {e}"
@@ -146,23 +145,27 @@ class Cache:
             return user_msg, None
         
         # Handle exceptions if we got any
-        if isinstance(res, IntegrityError):
+        if isinstance(res, exc.IntegrityError):
+            bot_logger.debug("Integrity error: parsing details...")
             # Parse what column is causing the issue
-            table, col = self.__parse_integrity_err_col(e)
-            bot_logger.error(f"DB Constraint violated for {table}.{col}: {e}")
+            table, col = self.__parse_integrity_err_col(res)
+            bot_logger.error(f"DB Constraint violated for {table}.{col}: {res}")
         
             if col == "username":
                 user_msg = "username is already taken"
             else:
                 user_msg = "You are already registered"
-            return user_msg, e     
+            
+            bot_logger.debug("Integrity error result parsed")
+            return user_msg, res     
         else:
-            user_msg = f"Unexpected internal error. Details: {e}"
+            bot_logger.debug("Uncaught error: preparsing user message")
+            user_msg = f"Unexpected internal error. Details: {res}"
             bot_logger.error(user_msg)
-            return user_msg, e
+            return user_msg, res
     
     @staticmethod
-    def __parse_integrity_err_col(e: IntegrityError):
+    def __parse_integrity_err_col(e: exc.IntegrityError):
         """
         Helper that extracts table & columnn that trigger IntegrityError
         :param e: exception of IntegrityError type
@@ -234,7 +237,6 @@ class Cache:
                                                level=record.levelname,
                                                func_name=record.funcName)
         # Some TODO
-        # Change prints with backup logger here
         # Mb add calls to a timeseries db here to track error and get alerted on them
         if e is not None:
             backup_logger.error(f"Logging to DB failed on row creation: {e}")

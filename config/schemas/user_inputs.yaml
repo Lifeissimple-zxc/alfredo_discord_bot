@@ -1,0 +1,8 @@
+register:
+  # Not keeping discord ID bc it is provided automatically
+  base:
+    - "username"
+  extra:
+    - "timezone"
+    - "currency"
+    - "spreadsheet"

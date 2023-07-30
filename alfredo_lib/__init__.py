@@ -17,3 +17,6 @@ ERROR_MESSAGES = MAIN_CFG["error_messages"]
 BASE_DIR = Path(__file__).parent.parent # Two levels up
 CMDS_DIR = BASE_DIR / "cmd_test"
 COGS_DIR = BASE_DIR / "cogs"
+
+with open(MAIN_CFG["user_input_schemas"]) as _schema_file:
+    USER_INPUT_SCHEMAS = yaml.safe_load(_schema_file)

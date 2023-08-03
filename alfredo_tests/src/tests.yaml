@@ -1,0 +1,3 @@
+TestCache:
+  db_path: "cache/alfredo_db_test.sqlite"
+  

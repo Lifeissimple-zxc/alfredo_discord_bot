@@ -1,22 +1,21 @@
 import re
 import logging
+import time
 from pathlib import Path
-from time import time
-from alfredo_lib.local_persistence.models import (
-    Base,
-    User,
-    LogRecordRow
-)
-from sqlalchemy.engine import Engine, ResultProxy
-from sqlalchemy.orm import sessionmaker
+from typing import Union
+
 from sqlalchemy import (
+    engine,
+    orm,
+    exc,
     create_engine
 )
-from sqlalchemy import exc
+
+from alfredo_lib.local_persistence import models
 from alfredo_lib import (
     MAIN_CFG
 )
-from typing import Union
+
 
 # Get loggers
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
@@ -37,20 +36,20 @@ class Cache:
         Instantiates the class, creates the db & tables if they do not exist
         """
         self.db_path_raw = db_path
-        self.users_table = User
-        self.logs_table = LogRecordRow
+        self.users_table = models.User
+        self.logs_table = models.LogRecordRow
         self.engine = self._create_engine(db_path)
         # TODO Check if the below two lines can be merged?
-        Session = sessionmaker(bind=self.engine)
+        Session = orm.sessionmaker(bind=self.engine)
         self.sesh = Session()
-        self.base = Base
+        self.base = models.Base
         # Actually create schema in the db
         self._create_db_tables()
     # Create all the tables on init (along with session and )
     # Write user-related operations
     
     @staticmethod
-    def _create_engine(db_path: str) -> Engine:
+    def _create_engine(db_path: str) -> engine.Engine:
         """
         Creates engine object, creates folders in db_path if they don't exist
         """
@@ -66,6 +65,17 @@ class Cache:
         
         return create_engine(f"sqlite:///{path_obj.absolute()}", echo=False)
     
+    def _drop_all_tables(self):
+        """
+        Private helper to drop all tables in schema, needed for tests
+        """
+        with self.engine.begin() as conn:
+            for table in self.base.metadata.sorted_tables:
+                conn.execute(table.delete())
+            conn.commit()
+
+        
+    
     def _create_db_tables(self):
         #TODO
         """
@@ -79,7 +89,7 @@ class Cache:
         """
         Generates current time as unix milisec timestamp
         """
-        return int(time() * 1000)
+        return int(time.time() * 1000)
     
     def _construct_table_row(self, dst_attr_name: str, **kwargs) -> tuple:
         """
@@ -92,16 +102,19 @@ class Cache:
         if table is None:
             msg = f"Local cache does not have {dst_attr_name} attr."
             return None, AttributeError(msg)
+        # This if is needed for tests of this method
+        if "created" not in kwargs:
+            kwargs["created"] = self._generate_ts()
         # Getting here means we can actually add our row
         try:
-            new_row = table(created=self._generate_ts(), **kwargs)
+            new_row = table(**kwargs)
         except Exception as e:
             return None, e
         
         bot_logger.debug(f"Prepared new row for {dst_attr_name}: {kwargs}")
         return new_row, None
     
-    def _add_new_row(self, row_struct: ResultProxy) -> Union[Exception, None]:
+    def _add_new_row(self, row_struct: engine.ResultProxy) -> Union[Exception, None]:
         """
         Adds row_struct to the corresponding table
         :param row_struct: sqlalchemy row object
@@ -190,14 +203,15 @@ class Cache:
         :return: tuple(User, error if any)
         """
         bot_logger.debug(f"Fetching user data for {discord_id}")
-        user = self.sesh.query(User).filter(User.discord_id==discord_id).first()
+        user = (self.sesh.query(models.User)
+                .filter(models.User.discord_id==discord_id).first())
         if user is None:
             bot_logger.debug(f"No results for {discord_id}")
             return None, ValueError("User not registered")
         return user, None
     
     @staticmethod
-    def __parse_user_row(user: User) -> dict:
+    def __parse_user_row(user: models.User) -> dict:
         """
         Parses user ORM row to a dict
         """

@@ -1,4 +1,10 @@
 #TODO base and extra need to come from params!
+import logging
+
+from alfredo_lib import MAIN_CFG
+# Get loggers
+bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
+backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
 
 class InputController:
     """
@@ -23,9 +29,10 @@ class InputController:
                 raise ValueError(f"Command {command} does not have base defined")
             parsed_setup = {
                 "base": set(setup["base"]),
-                "extra": set(setup["base"])
+                "extra": set(setup["extra"])
             }
             container[command] = parsed_setup.copy()
+        bot_logger.debug("Parsed input schema: %s", container)
         return container
     
     def validate(self, user_input: dict, command: str) -> set:
@@ -51,9 +58,8 @@ class InputController:
         mode = "all" or mode
         # Doing command data lookup once here
         command_keys = self.input_schemas[command]
-
         if mode == "all":
-            return command_keys["base"] | command_keys["extra"]
+            return (command_keys["base"] | command_keys["extra"])
         elif mode == "base":
             return command_keys["base"]
         elif mode == "extra":

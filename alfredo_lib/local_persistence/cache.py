@@ -1,6 +1,7 @@
 import re
 import logging
 import time
+import json
 from pathlib import Path
 from typing import Union
 
@@ -73,9 +74,7 @@ class Cache:
             for table in self.base.metadata.sorted_tables:
                 conn.execute(table.delete())
             conn.commit()
-
-        
-    
+   
     def _create_db_tables(self):
         #TODO
         """
@@ -187,14 +186,6 @@ class Cache:
         e_str = str(e).lower()
         tab_col = re.search("failed: ([a-z\.\_]+)", e_str).group(1).split(".")
         return tab_col[0], tab_col[1]
-    
-    def update_user_data(self, field: str, value: str,
-                         discord_id: int) -> tuple:
-        """
-        ### Updates field with value in users table
-        :return: tuple(user message, error if any)
-        """
-        return True, None
 
     def _fetch_user_data(self, discord_id: int) -> tuple:
         """
@@ -208,37 +199,57 @@ class Cache:
         if user is None:
             bot_logger.debug(f"No results for {discord_id}")
             return None, ValueError("User not registered")
-        return user, None
+        return user, None  
     
     @staticmethod
-    def __parse_user_row(user: models.User) -> dict:
+    def __parse_db_row(row: engine.row.Row) -> dict:
         """
-        Parses user ORM row to a dict
+        Parses an ORM row to a dict
         """
-        # Make several modes: dict and string
+        # Make several modes: dict and string TODO
         bot_logger.debug("Parsing user data to a dict")
-        user_dict = {}
-        cols = user.__class__.__table__.columns
+        res = {}
+        cols = row.__class__.__table__.columns
         for col in cols:
             col_name = col.name
-            val = getattr(user, col_name)
+            val = getattr(row, col_name)
             if val: 
-                user_dict[col_name] = val
-        return user_dict
+                res[col_name] = val
+        return json.dumps(res, indent=4)
     
     def get_user(self, discord_id: int) -> tuple:
         """
         ### Gets user data as dict
         """
-        user, e = self._fetch_user_data(discord_id)
+        bot_logger.debug("Fetching user data for %s", discord_id)
+        user, e = self._fetch_user_data(discord_id=discord_id)
         # Check for error
         if e is not None:
             user_msg = f"Failed to get user data: {e}"
             bot_logger.error(user_msg)
             return None, user_msg
         # Parse user data to dict
-        user_data = self.__parse_user_row(user)
+        bot_logger.debug("Got user data for %s", discord_id)
+        user_data = self.__parse_db_row(user)
+        bot_logger.debug("Parsed user data for %s", discord_id)
         return user_data, None
+    
+    def update_user_data(self, discord_id: int,
+                         user_update: dict) -> Union[Exception, None]:
+        """
+        ### Updates field with value in users table
+        :return: error if any
+        """
+        (self.sesh.query(models.User).filter(models.User.discord_id == discord_id)
+         .update(user_update))
+        try: 
+            self.sesh.commit()
+            bot_logger.debug("Update query succeeded for user %s", discord_id)
+            return None
+        except Exception as e:
+            bot_logger.error("Update query failed for user %s: %s", discord_id, e)
+            self.sesh.rollback()
+            return e
     
     def add_log_row(self, record: logging.LogRecord):
         """

@@ -42,32 +42,7 @@ def run_alfredo():
                                error: Exception):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send(MAIN_CFG["error_messages"]["missing_input"])
-
-    # Command for registering a user
-    @bot.command()
-    async def register(ctx: commands.Context, username: str):
-        # Read data to variables
-        discord_id = ctx.author.id
-        # Add to db
-        # TODO return a tuple here and check for error
-        user_msg, e = local_cache.create_user(username=username, discord_id=discord_id)
-        # Check for error
-        if e is not None:
-            await ctx.send(f"Registration failed for {username}: {user_msg}")
-            return
-        # Give feedback to a user
-        await ctx.send(f"User {username} registered with discord_id {discord_id}")
-
-    @bot.command()
-    async def get_user(ctx: commands.Context):
-        # Read data to variables
-        discord_id = ctx.author.id
-        # Read from DB
-        user_data, user_msg = local_cache.get_user(discord_id)
-        if user_msg:
-            await ctx.send(user_msg)
-        await ctx.send(f"Your data: {user_data}")
-
+    
     ### Commands to read data iteratively
 
     def check_ctx(msg: discord.Message, author: discord.User):
@@ -78,10 +53,14 @@ def run_alfredo():
         ### Continuously prompts for user input.
         Stores user responsed in a dict.
         """
+        #TODO timeout 
+        discord_id = ctx.author.id
         bot_logger.debug("Prompting user %s for %s command data",
-                         ctx.author.id, command)
+                         discord_id, command)
         res = {"discord_id": ctx.author.id}
-        for key in input_controller.create_prompt_keys(command=command, mode=mode):
+        input_keys = input_controller.create_prompt_keys(command=command, mode=mode)
+        bot_logger.debug("Prepared input keys %s for user %s", input_keys, discord_id)
+        for key in input_keys:
             await ctx.message.author.send(f"Please enter your {key}!")
             
             try:
@@ -96,12 +75,12 @@ def run_alfredo():
                 break
 
             res[key] = data
-            print(res)
         bot_logger.debug("Collected data for command %s: %s", command, res)
         return res
 
+    ### Commands
     @bot.command()
-    async def reg_new(ctx: commands.Context):
+    async def register(ctx: commands.Context):
         command = "register" #TODO make it a config
         reg_data = await get_input(ctx=ctx, command=command, mode="all")
         
@@ -128,12 +107,58 @@ def run_alfredo():
         await ctx.message.author.send(
             f"User {username} registered with discord_id {reg_data['discord_id']}"
         )
+    
+    @bot.command()
+    async def whoami(ctx: commands.Context):
+        # Read data to variables
+        discord_id = ctx.author.id
+        bot_logger.debug("User %s invoked %s command", discord_id, "get_my_data")
+        # Read from DB
+        user_data, user_msg = local_cache.get_user(discord_id)
+        if user_msg:
+            await ctx.message.author.send(user_msg)
+        await ctx.message.author.send(f"Your data:\n{user_data}")
 
-
-
-                
+    @bot.command(aliases=("uud",))
+    async def update_user_data(ctx: commands.Context,
+                               field: str = None, value: str = None):
+        """
+        Updates user data
+        """
+        # TODO can commmands have arguments for updating a specific field?
+        command = "update_user_data" #TODO make it a config
+        discord_id = ctx.author.id
+        bot_logger.debug("%s user invoked %s command with args: %s, %s",
+                         discord_id, command, field, value)
+        user_update = {field: value}
+        if field is None or value is None:
+            # Prompt for fields to update
+            user_update = await get_input(ctx=ctx, command="register", mode="all")
+            bot_logger.debug("Received input user input update from user %s: %s",
+                            discord_id, user_update)
+            # Collect user data
+            if not user_update:
+                await ctx.message.author.send(
+                    "No update data provided, stopping command."
+                )
+                return
+        # Attempt an update
+        bot_logger.debug("Attempting update on user %s db data", discord_id)
+        e = local_cache.update_user_data(discord_id=discord_id, user_update=user_update)
+        # Log on results
+        if e is not None:
+            bot_logger.error("Update for user %s failed, %s", discord_id, e)
+            await ctx.message.author.send("Error when updating user data: %s", e)
+            return
+        bot_logger.debug("Update for user %s succeeded", discord_id)
+        await ctx.message.author.send("Data updated!")
     
     # This is where the bot is actually launched
     bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)
 
-run_alfredo()
+
+if __name__ == "__main__":
+    try:
+        run_alfredo()
+    except Exception as e:
+        bot_logger.error(f"Unexpected exception: {e}")

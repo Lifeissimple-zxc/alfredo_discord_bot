@@ -5,6 +5,8 @@ disable_existing_loggers: False
 formatters:
   main:
     format: "[%(asctime)s - %(levelname)s - %(funcName)s()]\t %(message)s"
+  test:
+    format: "[%(asctime)s - %(filename)s - %(levelname)s - %(funcName)s()]\t %(message)s"
 
 filters:
   DiscordErrorFilter:
@@ -58,6 +60,11 @@ handlers:
   StreamHandler:
     class: "logging.StreamHandler"
     formatter: "main"
+  TestFileHandler:
+    (): "alfredo_lib.alfredo_logger.BackupFileHandler"
+    folder: "./alfredo_tests/src/test_log"
+    file: "alfredo_test_log.log"
+    formatter: "test"
 
 
 loggers:
@@ -74,5 +81,9 @@ loggers:
       - "StreamHandler"
       - "BackupFileHandler"
     propagate: False
+  test_logger:
+    level: "DEBUG"
+    handlers:
+      - "TestFileHandler"
 
     

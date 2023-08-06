@@ -12,13 +12,6 @@ from alfredo_lib.alfredo_deps import (
 )
 from alfredo_lib import MAIN_CFG, ENV_VARS
 
-NEED_KEYS = [
-    "NAME",
-    "SHEET",
-    "CURRENCY",
-    "TZ"
-]
-
 # Logging boilerplate
 # Read logging configuration
 with open(MAIN_CFG["logging_config"]) as _log_cfg:

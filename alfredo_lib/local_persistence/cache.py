@@ -171,7 +171,7 @@ class Cache:
             bot_logger.debug("Integrity error result parsed")
             return user_msg, res     
         else:
-            bot_logger.debug("Uncaught error: preparsing user message")
+            bot_logger.warning("Uncaught error: preparsing user message")
             user_msg = f"Unexpected internal error. Details: {res}"
             bot_logger.error(user_msg)
             return user_msg, res

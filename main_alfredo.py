@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import logging.config as log_config
+from typing import Optional
 
 import discord
 from discord.ext import commands
@@ -30,16 +31,14 @@ def run_alfredo():
     intents = discord.Intents.default()
     intents.message_content = True
 
-    bot = commands.Bot(command_prefix=MAIN_CFG["command_prefix"],
-                       intents=intents)
+    bot = commands.Bot(command_prefix=MAIN_CFG["command_prefix"], intents=intents)
 
     @bot.event
     async def on_ready():
-        bot_logger.debug(f"User: {bot.user} (ID: {bot.user.id})")
+        bot_logger.debug("User: %s (ID: %s)", bot.user, bot.user.id)
 
     @bot.event
-    async def on_command_error(ctx: commands.Context,
-                               error: Exception):
+    async def on_command_error(ctx: commands.Context, error: Exception):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send(MAIN_CFG["error_messages"]["missing_input"])
     
@@ -48,7 +47,8 @@ def run_alfredo():
     def check_ctx(msg: discord.Message, author: discord.User):
         return msg.author == author and msg.channel == author.dm_channel
 
-    async def get_input(ctx: commands.Context, command: str, mode: str):
+    async def get_input(ctx: commands.Context, command: str,
+                        model: str, mode: str):
         """
         ### Continuously prompts for user input.
         Stores user responsed in a dict.
@@ -57,8 +57,9 @@ def run_alfredo():
         discord_id = ctx.author.id
         bot_logger.debug("Prompting user %s for %s command data",
                          discord_id, command)
+        #TODO this should be in config or we can have issues
         res = {"discord_id": ctx.author.id}
-        input_keys = input_controller.create_prompt_keys(command=command, mode=mode)
+        input_keys = input_controller.create_prompt_keys(model=model, mode=mode)
         bot_logger.debug("Prepared input keys %s for user %s", input_keys, discord_id)
         for key in input_keys:
             await ctx.message.author.send(f"Please enter your {key}!")
@@ -78,29 +79,28 @@ def run_alfredo():
         bot_logger.debug("Collected data for command %s: %s", command, res)
         return res
 
-    ### Commands
+    ### Commands that users are expected to call
     @bot.command()
     async def register(ctx: commands.Context):
         command = "register" #TODO make it a config
-        reg_data = await get_input(ctx=ctx, command=command, mode="all")
+        reg_data = await get_input(ctx=ctx, command=command, model="user", mode="all")
         
         # Validate command and send message to the user on success?
-        missing = input_controller.validate(user_input=reg_data, command=command)
+        # TODO Exception uncaught here
+        missing = input_controller.validate(user_input=reg_data, model="user")
         if missing:
             await ctx.message.author.send(
                 f"Cannot run {command}. Missing fields: {missing}"
             )
             return
-        await ctx.message.author.send(
-            f"All base fields are present. Running {command}."
-        )
+        await ctx.message.author.send(f"All fields are present. Running {command}.")
 
         user_msg, e = local_cache.create_user(reg_data)
         username = reg_data["username"]
         # Check for error
         if e is not None:
             await ctx.message.author.send(
-                f"Registration failed for {username}: {user_msg}"
+                f"{command} failed for {username}: {user_msg}"
             )
             return
         # Give feedback to a user
@@ -112,32 +112,52 @@ def run_alfredo():
     async def whoami(ctx: commands.Context):
         # Read data to variables
         discord_id = ctx.author.id
+        #TODO how can we have this logging call embedded into the commands?
+        #TODO mb a decorator in the bot class?
         bot_logger.debug("User %s invoked %s command", discord_id, "get_my_data")
         # Read from DB
         user_data, user_msg = local_cache.get_user(discord_id)
         if user_msg:
             await ctx.message.author.send(user_msg)
+            return
         await ctx.message.author.send(f"Your data:\n{user_data}")
 
-    @bot.command(aliases=("uud",))
+    @bot.command(aliases=("uud","update"))
     async def update_user_data(ctx: commands.Context,
-                               field: str = None, value: str = None):
+                               field: Optional[str] = None,
+                               value: Optional[str] = None):
         """
-        Updates user data
+        ### Updates user data
         """
-        # TODO can commmands have arguments for updating a specific field?
         command = "update_user_data" #TODO make it a config
         discord_id = ctx.author.id
         bot_logger.debug("%s user invoked %s command with args: %s, %s",
                          discord_id, command, field, value)
+        # Check if users are expected to update this field
+        if (field not in input_controller.create_prompt_keys(model="user", mode="all")
+            and field is not None):
+            await ctx.author.send(f"{field} can't be updated by users")
+            return
+        # Also check that value is not empty
+        check = bool(field) + bool(value)
+        bot_logger.debug("Update check is %i", check)
+        if check == 1 or (value is not None and len(value) == 0):
+            await ctx.author.send(f"Can't run update with {value}, try again")
+            return
+
         user_update = {field: value}
-        if field is None or value is None:
+        # TODO the below IF needs to be a function?
+        # if check is zero, we prompt for all fields!
+        if check == 0:
+            bot_logger.debug("%s user did not provide any fields, prompting...",
+                             discord_id)
             # Prompt for fields to update
-            user_update = await get_input(ctx=ctx, command="register", mode="all")
-            bot_logger.debug("Received input user input update from user %s: %s",
-                            discord_id, user_update)
-            # Collect user data
-            if not user_update:
+            user_update = await get_input(ctx=ctx, command=command,
+                                          model="user", mode="all")
+            bot_logger.debug("Received update input from user %s: %s",
+                             discord_id, user_update)
+            # Len of 1 means we only have discord id
+            if len(user_update) == 1:
                 await ctx.message.author.send(
                     "No update data provided, stopping command."
                 )

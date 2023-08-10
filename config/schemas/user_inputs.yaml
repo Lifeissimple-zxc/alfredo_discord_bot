@@ -1,4 +1,4 @@
-register:
+user:
   # Not keeping discord ID bc it is provided automatically
   base:
     - "username"

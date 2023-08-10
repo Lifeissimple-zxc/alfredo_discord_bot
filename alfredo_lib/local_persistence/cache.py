@@ -13,9 +13,7 @@ from sqlalchemy import (
 )
 
 from alfredo_lib.local_persistence import models
-from alfredo_lib import (
-    MAIN_CFG
-)
+from alfredo_lib import MAIN_CFG
 
 
 # Get loggers
@@ -28,7 +26,58 @@ backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
 # Update data in users table
 # Add transaction row to the table
 # Drop row in the transaction table
-class Cache:
+class DbErrorHandler:
+    """
+    Class respponsible for parsing DB errors.
+    Generates user-facing messages as well.
+    """
+
+    @staticmethod
+    def _handle_unexpected_err(e: Exception):
+        """
+        TODO
+        """
+        user_msg = f"Unexpected internal error. Details: {e}"
+        bot_logger.error(user_msg)
+        return user_msg, e
+
+    @staticmethod
+    def _parse_integrity_err_col(e: exc.IntegrityError):
+        """
+        Helper that extracts table & columnn that trigger IntegrityError
+        :param e: exception of IntegrityError type
+        :return: tuple(table, col)
+        """
+        # Doing this type check despite EAFP due to bot being async
+        # It causes passing wrong types here go unnoticed!
+        if not isinstance(e, exc.IntegrityError):
+            msg = f"Wrong handler for error {e} of type {type(e)}"
+            bot_logger.error(msg)
+            raise TypeError(msg)
+        bot_logger.debug("Parsing integriy error data...")
+        tab_col = re.search("failed: ([a-z\.\_]+)", str(e).lower()).group(1).split(".")
+        table, col = tab_col[0], tab_col[1]
+        bot_logger.error("DB Constraint violated: %s", e) 
+        return table, col
+    
+    def handle_integrity_err_user(self, e: exc.IntegrityError):
+        """
+        TODO
+        """
+        table, col = self._parse_integrity_err_col(e)
+        bot_logger.debug("%s.%s caused error", table, col)
+
+        if col == "username":
+            user_msg = "username is already taken"
+        else:
+            user_msg = "You are already registered"
+        
+        bot_logger.debug("Integrity error result parsed")
+        return user_msg, e
+
+
+
+class Cache(DbErrorHandler):
     """
     Class responsible for all the db operations
     """
@@ -134,8 +183,6 @@ class Cache:
         :param discord_id: discord_id of a user
         :return: tuple(user message, error if any)
         """
-        # TODO exceptions? have no idea what might occur here
-        # sqlite3.IntegrityError when unique constraint fails
         # Prepare user data from input
         username = reg_data["username"]
         user_row, e = self._construct_table_row(dst_attr_name="users_table", **reg_data)
@@ -144,7 +191,7 @@ class Cache:
             user_msg = f"Internal data error: {e}"
             # Specify msg in case we have attr error
             if isinstance(e, AttributeError):
-                user_msg = "Internal data error: users data does not exit on server."
+                user_msg = "Internal data error: users data does not exist on server."
             return user_msg, e
 
         bot_logger.debug(f"Prepared user data for {username} reg.")
@@ -158,34 +205,10 @@ class Cache:
         
         # Handle exceptions if we got any
         if isinstance(res, exc.IntegrityError):
-            bot_logger.debug("Integrity error: parsing details...")
-            # Parse what column is causing the issue
-            table, col = self.__parse_integrity_err_col(res)
-            bot_logger.error(f"DB Constraint violated for {table}.{col}: {res}")
-        
-            if col == "username":
-                user_msg = "username is already taken"
-            else:
-                user_msg = "You are already registered"
-            
-            bot_logger.debug("Integrity error result parsed")
-            return user_msg, res     
+            return self.handle_integrity_err_user(res)
         else:
             bot_logger.warning("Uncaught error: preparsing user message")
-            user_msg = f"Unexpected internal error. Details: {res}"
-            bot_logger.error(user_msg)
-            return user_msg, res
-    
-    @staticmethod
-    def __parse_integrity_err_col(e: exc.IntegrityError):
-        """
-        Helper that extracts table & columnn that trigger IntegrityError
-        :param e: exception of IntegrityError type
-        :return: tuple(table, col)
-        """
-        e_str = str(e).lower()
-        tab_col = re.search("failed: ([a-z\.\_]+)", e_str).group(1).split(".")
-        return tab_col[0], tab_col[1]
+            return self._handle_unexpected_err(res)
 
     def _fetch_user_data(self, discord_id: int) -> tuple:
         """

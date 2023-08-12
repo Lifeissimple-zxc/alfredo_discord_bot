@@ -6,3 +6,12 @@ user:
     - "timezone"
     - "currency"
     - "spreadsheet"
+
+transaction:
+  # currency needs to be pulled from user data
+  base:
+    - "amount"
+    - "category"
+  extra:
+    - "split_percent"
+    - "comment"

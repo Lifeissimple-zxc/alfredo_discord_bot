@@ -1,17 +1,17 @@
 user:
   # Not keeping discord ID bc it is provided automatically
   base:
-    - "username"
+    username: "str"
   extra:
-    - "timezone"
-    - "currency"
-    - "spreadsheet"
+    timezone: "str"
+    currency: "str"
+    spreadsheet: "str"
 
 transaction:
   # currency needs to be pulled from user data
   base:
-    - "amount"
-    - "category"
+    amount: "float"
+    category: "str"
   extra:
-    - "split_percent"
-    - "comment"
+    split_percent: "float"
+    comment: "str"

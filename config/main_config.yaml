@@ -21,3 +21,5 @@ backup_logger_name: "backup_logger"
 test_logger_name: "test_logger"
 
 user_input_schemas: "config/schemas/user_inputs.yaml"
+
+float_precision: 4

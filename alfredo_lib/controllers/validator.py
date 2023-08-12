@@ -7,7 +7,51 @@ from alfredo_lib import MAIN_CFG
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
 
-class InputController:
+
+class InputValidator:
+    """
+    Validates types of data provided by user
+    """
+    def __init__(self, input_schemas: dict):
+        self.types_schema = self._parse_types_schema(input_schemas)
+
+    @staticmethod
+    def _parse_types_schema(input_schemas: dict):
+        container = {}
+        for model, data in input_schemas.items():
+            container[model] = input_schemas[model]["base"]
+            if "extra" in data:
+                container[model] = {
+                    **container[model],
+                    **input_schemas[model]["extra"]
+                }
+        return container
+
+    @staticmethod
+    def _convert_type(data: str, target_type: str):
+        data = data.strip()
+        try:
+            if target_type == "str":
+                return data, None
+            elif target_type == "float":
+                return float(data), None
+            elif target_type == "int":
+                return int(data), None
+        except ValueError as e:
+            return None, e
+    
+    def parse_input(self, model: str, field: str, data: str) -> tuple:
+        """
+        Parses input to the target type defined by field key for model in schema
+        """
+        res, e = self._convert_type(data=data,
+                                    target_type=self.types_schema[model][field])
+        if e is not None:
+            return None, e
+        return res, None
+
+
+class InputController(InputValidator):
     """
     Controls validity of user inputs and generates prompts for collecting them.
     """
@@ -16,6 +60,7 @@ class InputController:
         Creates an instance of the validator class
         :param input_schemas: parsed yaml describing base and extra keys for data models
         """
+        super().__init__(input_schemas)
         self.input_schemas = self._parse_input_schemas(input_schemas)
 
     @staticmethod
@@ -29,15 +74,16 @@ class InputController:
             if not setup.get("base", None):
                 raise ValueError(f"Command {model} does not have base defined")
 
-            container[model] = {"base": set(setup["base"])}
+            container[model] = {"base": set(setup["base"].keys())}
             if not setup.get("extra", None):
+                container[model]["extra"] = set()
                 continue
-            container[model]["extra"] = set(setup["extra"])
+            container[model]["extra"] = set(setup["extra"].keys())
 
         bot_logger.debug("Parsed input schema: %s", container)
         return container
     
-    def validate(self, user_input: dict, model: str) -> set:
+    def validate_keys(self, user_input: dict, model: str) -> set:
         """
         ### Validates whether user input has all the base keys
         :returns: Missing keys

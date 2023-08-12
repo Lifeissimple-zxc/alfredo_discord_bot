@@ -48,20 +48,27 @@ def run_alfredo():
         return msg.author == author and msg.channel == author.dm_channel
 
     async def get_input(ctx: commands.Context, command: str,
-                        model: str, mode: str):
+                        model: str, include_extra: Optional[bool] = None,
+                        rec_discord_id: Optional[bool] = None) -> dict:
         """
         ### Continuously prompts for user input.
         Stores user responsed in a dict.
+        :param rec_discord_id: True means auto adding a user's discord_id to the input 
         """
-        #TODO timeout 
+        if rec_discord_id is None:
+            rec_discord_id = True
+        if include_extra is None:
+            include_extra = True
+
         discord_id = ctx.author.id
         bot_logger.debug("Prompting user %s for %s command data",
                          discord_id, command)
         #TODO this should be in config or we can have issues
-        res = {"discord_id": ctx.author.id}
-        input_keys = input_controller.create_prompt_keys(model=model, mode=mode)
-        bot_logger.debug("Prepared input keys %s for user %s", input_keys, discord_id)
-        for key in input_keys:
+        res = {}
+        if rec_discord_id:
+            res["discord_id"] = ctx.author.id
+        
+        for key in input_controller.input_schemas[model]["base"]:
             await ctx.message.author.send(f"Please enter your {key}!")
             
             try:
@@ -71,9 +78,41 @@ def run_alfredo():
                     timeout=20
                 )
                 data = resp.content
+                bot_logger.debug("Parsing %s...", key)
+                data, e = input_controller.parse_input(model=model,
+                                                       field=key, data=data)
+                if e is not None:
+                    await ctx.message.author.send(f"{key} cannot be parsed: {e}")
+                    return res
+                
             except asyncio.TimeoutError:
                 await ctx.message.author.send("Took too long to respond. Aborting!")
-                break
+                # Returning bc 1 missing base field is a problem
+                return res
+
+            res[key] = data
+        # TODO this repetitive code should be abstracted to a function?
+        # Collecing extra fields is optional hence the if
+        if include_extra:
+            for key in input_controller.input_schemas[model]["extra"]:
+                await ctx.message.author.send(f"Please enter your {key}!")
+                
+                try:
+                    resp = await bot.wait_for(
+                        "message",
+                        check=lambda message: check_ctx(message, ctx.author),
+                        timeout=20
+                    )
+                    data = resp.content
+                    bot_logger.debug("Parsing %s...", key)
+                    data, e = input_controller.parse_input(model=model,
+                                                       field=key, data=data)
+                    if e is not None:
+                        await ctx.message.author.send(f"{key} cannot be parsed: {e}")
+                        continue
+                except asyncio.TimeoutError:
+                    await ctx.message.author.send("Took too long to respond. Aborting!")
+                    break
 
             res[key] = data
         bot_logger.debug("Collected data for command %s: %s", command, res)
@@ -83,11 +122,12 @@ def run_alfredo():
     @bot.command()
     async def register(ctx: commands.Context):
         command = "register" #TODO make it a config
-        reg_data = await get_input(ctx=ctx, command=command, model="user", mode="all")
+        reg_data = await get_input(ctx=ctx, command=command,
+                                   model="user", include_extra=True)
         
         # Validate command and send message to the user on success?
         # TODO Exception uncaught here
-        missing = input_controller.validate(user_input=reg_data, model="user")
+        missing = input_controller.validate_keys(user_input=reg_data, model="user")
         if missing:
             await ctx.message.author.send(
                 f"Cannot run {command}. Missing fields: {missing}"
@@ -133,7 +173,7 @@ def run_alfredo():
         discord_id = ctx.author.id
         bot_logger.debug("%s user invoked %s command with args: %s, %s",
                          discord_id, command, field, value)
-        # Check if users are expected to update this field
+        # Check if users are expected to update this field  
         if (field not in input_controller.create_prompt_keys(model="user", mode="all")
             and field is not None):
             await ctx.author.send(f"{field} can't be updated by users")
@@ -153,7 +193,7 @@ def run_alfredo():
                              discord_id)
             # Prompt for fields to update
             user_update = await get_input(ctx=ctx, command=command,
-                                          model="user", mode="all")
+                                          model="user", include_extra=True)
             bot_logger.debug("Received update input from user %s: %s",
                              discord_id, user_update)
             # Len of 1 means we only have discord id
@@ -172,6 +212,33 @@ def run_alfredo():
             return
         bot_logger.debug("Update for user %s succeeded", discord_id)
         await ctx.message.author.send("Data updated!")
+    
+    @bot.command(aliases=("tr",))
+    async def new_transaction(ctx: commands.Context):
+        """
+        ### Adds a new transaction to the sheet saved by the user
+        """
+        bot_logger.debug("Command invoked")
+        discord_id = ctx.author.id
+        command = "new_transaction"
+        # Check if user is registered
+        user, e = local_cache.get_user(discord_id=discord_id, parse=False)
+        if e is not None:
+            await ctx.author.send(f"Error, cannot add transaction: {e}")
+            return
+        # Prompt for input
+        tr_data = await get_input(ctx=ctx, command=command, model="transaction",
+                                  rec_discord_id=False, include_extra=True)
+        # Validate input (parse numbers) TODO
+        # Add user level features fot the user input
+        tr_data["user_id"] = user.user_id
+        tr_data["currency"] = user.currency # Check for None?
+        bot_logger.debug("Transaction data prepared %s", tr_data)
+        # Write to db
+        msg, e = local_cache.create_transaction(tr_data)
+        if e is not None:
+            bot_logger.error("new_transaction() failed: %s", e)
+        await ctx.author.send(msg)
     
     # This is where the bot is actually launched
     bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)

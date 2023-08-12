@@ -7,6 +7,10 @@ from sqlalchemy import (
     ForeignKey
 )
 
+from alfredo_lib import MAIN_CFG
+
+FLOAT_PRECISION = MAIN_CFG["float_precision"]
+
 # Define our tables
 # First we need a base to access metadata about schema
 Base = declarative_base()
@@ -41,14 +45,14 @@ class Transaction(Base):
         ForeignKey("users.user_id",ondelete="CASCADE"),
         nullable=False
     )
-    amount = Column(Float(precision=4), nullable=False)
+    amount = Column(Float(precision=FLOAT_PRECISION), nullable=False)
     # Making it three here because of ISO 4217
     # Ideally, I should not be storing text, but model currencies as a separate table :)
     # For comment text is the only option
     currency = Column(String(3), nullable=False)
     category = Column(String(30), nullable=False)
     comment = Column(String(100))
-    split_percent = Column(Float(precision=2))
+    split_percent = Column(Float(precision=FLOAT_PRECISION))
     # This field needs to update every time users update a transaction
     updated_at = Column(Integer, nullable=False)
 

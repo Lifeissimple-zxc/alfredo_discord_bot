@@ -3,7 +3,7 @@ import logging
 import time
 import json
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 
 from sqlalchemy import (
     engine,
@@ -30,7 +30,6 @@ class DbErrorHandler:
     Class respponsible for parsing DB errors.
     Generates user-facing messages as well.
     """
-
     @staticmethod
     def _handle_unexpected_err(e: Exception):
         """
@@ -142,8 +141,6 @@ class BaseCache(DbErrorHandler):
         # Make several modes: dict and string TODO
         bot_logger.debug("Parsing user data to a dict")
         res = {}
-        bot_logger.debug("Row class is %s", row.__class__)
-        bot_logger.debug("Row table is %s", row.__class__.__table__)
         cols = row.__class__.__table__.columns
         for col in cols:
             col_name = col.name
@@ -268,10 +265,13 @@ class UserCache(BaseCache):
             return None, ValueError("User not registered")
         return user, None  
     
-    def get_user(self, discord_id: int) -> tuple:
+    def get_user(self, discord_id: int, parse: Optional[bool] = None) -> tuple:
         """
         ### Gets user data as dict
         """
+        if parse is None:
+            parse = True
+
         bot_logger.debug("Fetching user data for %s", discord_id)
         user, e = self._fetch_user_data(discord_id=discord_id)
         # Check for error
@@ -281,10 +281,16 @@ class UserCache(BaseCache):
             return None, user_msg
         # Parse user data to dict
         bot_logger.debug("Got user data for %s", discord_id)
+        # Quick return when parsing is not needed
+        if not parse:
+            bot_logger.debug("parse=False, returing ORM object")
+            return user, None
+        
+        # Getting here means we parse ORM object for some user-facing stuff
         try:
             user_data = self._parse_db_row(user)
         except Exception as e:
-            bot_logger.error("Error parsing user data: %s", e)
+            bot_logger.error("%s Error parsing user data: %s", e)
         bot_logger.debug("Parsed user data for %s", discord_id)
         return user_data, None
     
@@ -309,10 +315,43 @@ class UserCache(BaseCache):
 class TransactionCache(BaseCache):
     """
     ### Class encapsulates all cache operations on transaction data
+    It inherits from users because transactions data need User attributes
     """
     def __init__(self, db_path: str):
         super().__init__(db_path=db_path)
         self.transactions_table = models.Transaction
+
+    def create_transaction(self, tr_data: dict) -> tuple:
+        """
+        ### Creates a new transaction entry in the local db
+        :param username: username for registration
+        :param discord_id: discord_id of a user
+        :return: tuple(user message, error if any)
+        """
+        # Prepare user data from input
+        # When a transaction is created, created and updated ts are the same!
+        tr_data["updated_at"] = self._generate_ts()
+        row, e = self._construct_table_row(dst_attr_name="transactions_table",
+                                           **tr_data) 
+        # Check for row struct creation errors
+        if e is not None:
+            user_msg = "Internal data error"
+            # Specify msg in case we have attr error
+            if isinstance(e, AttributeError):
+                user_msg += " users data does not exist on server."
+            return user_msg, e
+
+        bot_logger.debug("Prepared transaction data row")
+        # Add to db (this also rollbacks in case of errors)
+        res = self._add_new_row(row)
+        # Save path w/o issues
+        if res is None:
+            user_msg = "Transaction saved locally"
+            bot_logger.debug(user_msg)
+            return user_msg, None
+        
+        return "Error saving transaction", res
+        
 
 
 class Cache(UserCache, TransactionCache):
@@ -320,11 +359,8 @@ class Cache(UserCache, TransactionCache):
     #### Class unites all cache operations and is meant to be used in other modules
     """ 
     def __init__(self, db_path: str):
-        # Does not matter what class is used here
-        # It is BaseCache __init__ that is called anyways!
         super().__init__(db_path)
-        # Actually create schema in the db, only calling
-        print(dir(self))
+        # Actually create schema in the db, only calling in this class
         self._create_db_tables()
 
         

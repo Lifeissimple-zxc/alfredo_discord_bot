@@ -15,7 +15,6 @@ from sqlalchemy import (
 from alfredo_lib.local_persistence import models
 from alfredo_lib import MAIN_CFG
 
-
 # Get loggers
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
@@ -76,8 +75,7 @@ class DbErrorHandler:
         return user_msg, e
 
 
-
-class Cache(DbErrorHandler):
+class BaseCache(DbErrorHandler):
     """
     Class responsible for all the db operations
     """
@@ -86,15 +84,12 @@ class Cache(DbErrorHandler):
         Instantiates the class, creates the db & tables if they do not exist
         """
         self.db_path_raw = db_path
-        self.users_table = models.User
         self.logs_table = models.LogRecordRow
         self.engine = self._create_engine(db_path)
         # TODO Check if the below two lines can be merged?
         Session = orm.sessionmaker(bind=self.engine)
         self.sesh = Session()
         self.base = models.Base
-        # Actually create schema in the db
-        self._create_db_tables()
     # Create all the tables on init (along with session and )
     # Write user-related operations
     
@@ -139,6 +134,24 @@ class Cache(DbErrorHandler):
         """
         return int(time.time() * 1000)
     
+    @staticmethod
+    def _parse_db_row(row: engine.row.Row) -> dict:
+        """
+        Parses an ORM row to a dict
+        """
+        # Make several modes: dict and string TODO
+        bot_logger.debug("Parsing user data to a dict")
+        res = {}
+        bot_logger.debug("Row class is %s", row.__class__)
+        bot_logger.debug("Row table is %s", row.__class__.__table__)
+        cols = row.__class__.__table__.columns
+        for col in cols:
+            col_name = col.name
+            val = getattr(row, col_name)
+            if val: 
+                res[col_name] = val
+        return json.dumps(res, indent=4)
+    
     def _construct_table_row(self, dst_attr_name: str, **kwargs) -> tuple:
         """
         ### Mapper converting kwargs to an ORM row object of dst_attr_name.
@@ -175,6 +188,37 @@ class Cache(DbErrorHandler):
         except Exception as e:
             self.sesh.rollback()
             return e
+        
+    def add_log_row(self, record: logging.LogRecord):
+        """
+        ### Writes record to a local logs table
+        :param record: LogRecord from a logging call
+        """
+        log_row, e = self._construct_table_row(dst_attr_name="logs_table",
+                                               user_id=getattr(record, "user_id", None),
+                                               message=record.getMessage(),
+                                               level=record.levelname,
+                                               func_name=record.funcName)
+        # Some TODO
+        # Mb add calls to a timeseries db here to track error and get alerted on them
+        if e is not None:
+            backup_logger.error(f"Logging to DB failed on row creation: {e}")
+
+        res = self._add_new_row(log_row)
+        if res is not None:
+            backup_logger.error(f"Adding new DB row failed: {e}")
+
+
+class UserCache(BaseCache):
+    """
+    ### Class encapsulates all cache operations on user data
+    """
+    def __init__(self, db_path: str):
+        """
+        Instantiates the class, creates the db & tables if they do not exist
+        """
+        super().__init__(db_path)
+        self.users_table = models.User
 
     def create_user(self, reg_data: dict) -> tuple:
         """
@@ -224,22 +268,6 @@ class Cache(DbErrorHandler):
             return None, ValueError("User not registered")
         return user, None  
     
-    @staticmethod
-    def __parse_db_row(row: engine.row.Row) -> dict:
-        """
-        Parses an ORM row to a dict
-        """
-        # Make several modes: dict and string TODO
-        bot_logger.debug("Parsing user data to a dict")
-        res = {}
-        cols = row.__class__.__table__.columns
-        for col in cols:
-            col_name = col.name
-            val = getattr(row, col_name)
-            if val: 
-                res[col_name] = val
-        return json.dumps(res, indent=4)
-    
     def get_user(self, discord_id: int) -> tuple:
         """
         ### Gets user data as dict
@@ -253,7 +281,10 @@ class Cache(DbErrorHandler):
             return None, user_msg
         # Parse user data to dict
         bot_logger.debug("Got user data for %s", discord_id)
-        user_data = self.__parse_db_row(user)
+        try:
+            user_data = self._parse_db_row(user)
+        except Exception as e:
+            bot_logger.error("Error parsing user data: %s", e)
         bot_logger.debug("Parsed user data for %s", discord_id)
         return user_data, None
     
@@ -273,25 +304,28 @@ class Cache(DbErrorHandler):
             bot_logger.error("Update query failed for user %s: %s", discord_id, e)
             self.sesh.rollback()
             return e
-    
-    def add_log_row(self, record: logging.LogRecord):
-        """
-        ### Writes record to a local logs table
-        :param record: LogRecord from a logging call
-        """
-        log_row, e = self._construct_table_row(dst_attr_name="logs_table",
-                                               user_id=getattr(record, "user_id", None),
-                                               message=record.getMessage(),
-                                               level=record.levelname,
-                                               func_name=record.funcName)
-        # Some TODO
-        # Mb add calls to a timeseries db here to track error and get alerted on them
-        if e is not None:
-            backup_logger.error(f"Logging to DB failed on row creation: {e}")
 
-        res = self._add_new_row(log_row)
-        if res is not None:
-            backup_logger.error(f"Adding new DB row failed: {e}")
+
+class TransactionCache(BaseCache):
+    """
+    ### Class encapsulates all cache operations on transaction data
+    """
+    def __init__(self, db_path: str):
+        super().__init__(db_path=db_path)
+        self.transactions_table = models.Transaction
+
+
+class Cache(UserCache, TransactionCache):
+    """
+    #### Class unites all cache operations and is meant to be used in other modules
+    """ 
+    def __init__(self, db_path: str):
+        # Does not matter what class is used here
+        # It is BaseCache __init__ that is called anyways!
+        super().__init__(db_path)
+        # Actually create schema in the db, only calling
+        print(dir(self))
+        self._create_db_tables()
 
         
 

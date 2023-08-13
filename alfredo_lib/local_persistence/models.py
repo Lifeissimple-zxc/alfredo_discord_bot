@@ -1,4 +1,4 @@
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy import (
     Column,
     Integer,
@@ -19,7 +19,6 @@ class User(Base):
     """
     ### Class models user data powering alferdo
     """
-    # Tablename
     __tablename__ = "users"
 
     # User Attributes
@@ -30,6 +29,8 @@ class User(Base):
     created = Column(Integer, nullable=False)
     currency = Column(String(10))
     spreadsheet = Column(String(50))
+    # This automates fetching transactions
+    transactions = relationship("Transaction", backref="users")
 
 class Transaction(Base):
     """

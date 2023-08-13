@@ -257,7 +257,6 @@ class UserCache(BaseCache):
         :param discord_id: discord id of a user
         :return: tuple(User, error if any)
         """
-        bot_logger.debug(f"Fetching user data for {discord_id}")
         user = (self.sesh.query(models.User)
                 .filter(models.User.discord_id==discord_id).first())
         if user is None:
@@ -362,6 +361,33 @@ class Cache(UserCache, TransactionCache):
         super().__init__(db_path)
         # Actually create schema in the db, only calling in this class
         self._create_db_tables()
+
+    def get_user_transactions(
+            self,
+            user: models.User,
+            parse: Optional[bool] = None
+        ) -> Union[models.Transaction, dict, None]:
+        """
+        ### Fetches 
+        """
+        if parse is None:
+            parse = True
+
+        bot_logger.debug("Reading transactions of %s", user.username)
+        if not user.transactions:
+            return None
+        try:
+            tr_row = user.transactions[0]
+        except Exception as e:
+            bot_logger.error("Error reading transactions for %s: %s",
+                             user.username, e)
+        if not parse:
+            bot_logger.debug("parse=False, returning ORM transaction object")
+            return tr_row
+        # Separating result / no result scenarions with this if
+        # if tr_row:
+        return self._parse_db_row(tr_row)
+
 
         
 

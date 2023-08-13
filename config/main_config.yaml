@@ -7,6 +7,10 @@ logging_config: "config/logging_config.yaml"
 
 error_messages:
   missing_input: "Missing mandatory arguments. Check !help and try again"
+  prompt_timeout: "Took too long to response. Stopping input collection."
+
+messages:
+  transaction_exists: "Found existing transaction. Start a new one (y/n)?. Data:\n {transaction}"
 
 discord:
   project: "ALFREDO BOT"
@@ -23,3 +27,5 @@ test_logger_name: "test_logger"
 user_input_schemas: "config/schemas/user_inputs.yaml"
 
 float_precision: 4
+
+input_prompt_timeout: 30

@@ -186,6 +186,19 @@ class BaseCache(DbErrorHandler):
             self.sesh.rollback()
             return e
         
+    def delete_row(self, row_struct: engine.ResultProxy) -> Union[Exception, None]:
+        """
+        Removes row_struct from the db
+        :param row_struct: sqlalchemy row object
+        :return: error if any
+        """
+        try:
+            self.sesh.delete(row_struct)
+            self.sesh.commit()
+        except Exception as e:
+            self.sesh.rollback()
+            return e
+        
     def add_log_row(self, record: logging.LogRecord):
         """
         ### Writes record to a local logs table
@@ -337,7 +350,7 @@ class TransactionCache(BaseCache):
             user_msg = "Internal data error"
             # Specify msg in case we have attr error
             if isinstance(e, AttributeError):
-                user_msg += " users data does not exist on server."
+                user_msg += " transactions data does not exist on server."
             return user_msg, e
 
         bot_logger.debug("Prepared transaction data row")
@@ -350,8 +363,25 @@ class TransactionCache(BaseCache):
             return user_msg, None
         
         return "Error saving transaction", res
-        
 
+    def update_transaction(self, update: dict,
+                           transaction: models.Transaction) -> tuple:
+        """
+        Updates transaction
+        """
+        tr_to_update = self.sesh.query(models.Transaction).filter(
+            models.Transaction.transaction_id == transaction.transaction_id
+        )
+        tr_to_update.update(update)
+        try: 
+            self.sesh.commit()
+            bot_logger.debug("Update query succeeded for transaction %s",
+                             transaction.transaction_id)
+        except Exception as e:
+            bot_logger.error("Update query failed for transaction %s: %s",
+                             transaction.transaction_id, e)
+            self.sesh.rollback()
+            return e
 
 class Cache(UserCache, TransactionCache):
     """

@@ -4,14 +4,16 @@ import logging.config as log_config
 from typing import Optional
 
 import discord
-from discord.ext import commands
 import yaml
+from discord.ext import commands
 
 from alfredo_lib.alfredo_deps import (
     local_cache,
     input_controller,
     validator 
 )
+from alfredo_lib.local_persistence import models
+from alfredo_lib.bot import ex
 from alfredo_lib import MAIN_CFG, ENV_VARS
 
 # Logging boilerplate
@@ -41,7 +43,11 @@ def run_alfredo():
     @bot.event
     async def on_command_error(ctx: commands.Context, error: Exception):
         if isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send(MAIN_CFG["error_messages"]["missing_input"])
+            await ctx.message.author.send(MAIN_CFG["error_messages"]["missing_input"])
+        if isinstance(error, ex.UserNotRegisteredError):
+            await ctx.message.author.send(
+                MAIN_CFG["error_messages"]["missing_input"].format(cmd=error.cmd)
+            )
     
     ### Commands to read data iteratively
 
@@ -53,15 +59,12 @@ def run_alfredo():
         input_container: dict,
         model: str,
         mode: Optional[str] = None,
-        data_key: Optional[str] = None,
         input_controller: Optional[validator.InputController] = None
     ) -> dict:
         """
-        ### Prompts for data either using data_key
-        ### or input_schemas[model][mode] of input_controller
+        ### Prompts for data either using input_schemas[model][mode] of input_controller
         """
         # Quick mode check to avoid doing dowstream & save computation time
-        # TODO this does not need to happen when data_key is supplied
         mode = mode or "base"
         if mode not in ("base", "extra"):
             bot_logger.error("Bad mode supplied: %s", mode)
@@ -70,8 +73,6 @@ def run_alfredo():
         res = input_container.copy()
 
         prompt_keys = input_controller.input_schemas[model][mode]
-        if data_key is not None:
-            prompt_keys = set(data_key)
         
         for key in prompt_keys:
             await ctx.message.author.send(f"Please enter your {key}!")
@@ -105,17 +106,12 @@ def run_alfredo():
         
     async def get_input(ctx: commands.Context, command: str,
                         model: str, include_extra: Optional[bool] = None,
-                        rec_discord_id: Optional[bool] = None,
-                        data_key: Optional[str] = None) -> dict:
+                        rec_discord_id: Optional[bool] = None) -> dict:
         """
         ### Continuously prompts for user input.
         Stores user responsed in a dict.
         :param rec_discord_id: True means auto adding a user's discord_id to the input 
         """
-        # if key is provided, we only need 1 input
-        if data_key is not None:
-            return await _ask_user_for_data(ctx=ctx, input_container={},
-                                            model=model, data_key=data_key)
 
         if rec_discord_id is None:
             rec_discord_id = True
@@ -239,6 +235,46 @@ def run_alfredo():
         bot_logger.debug("Update for user %s succeeded", discord_id)
         await ctx.message.author.send("Data updated!")
     
+    @bot.command(aliases=("get_tr",))
+    async def get_transaction(ctx: commands.Context) -> tuple:
+        """
+        ### Fetches user transactions
+        :return:
+        """
+        bot_logger.debug("Command invoked")
+        discord_id = ctx.author.id
+        
+        # Check if caller discord id is in db
+        user, e = local_cache.get_user(discord_id=discord_id, parse=False)
+        if e is not None:
+            raise e
+        
+        transaction = local_cache.get_user_transactions(user=user, parse=True) 
+        if transaction:
+            await ctx.author.send(
+                MAIN_CFG["messages"]["ong_transaction_exists"].format(transaction=transaction)
+            )
+            return
+        await ctx.author.send("No ongoing transactions located")
+    
+    async def create_transaction(ctx: commands.Context, user: models.User,
+                                 command: str):
+        """
+        ### Creates a new transaction from scratch my prompting user for data
+        """
+        tr_data = await get_input(ctx=ctx, command=command, model="transaction",
+                                  rec_discord_id=False, include_extra=True)
+        # Validate input (parse numbers) TODO
+        # Add user level features fot the user input
+        tr_data["user_id"] = user.user_id
+        tr_data["currency"] = user.currency
+        bot_logger.debug("Transaction data prepared %s", tr_data)
+        # Write to db
+        msg, e = local_cache.create_transaction(tr_data)
+        if e is not None:
+            bot_logger.error("new_transaction() failed: %s", e)
+        await ctx.author.send(msg)
+
     @bot.command(aliases=("tr",))
     async def new_transaction(ctx: commands.Context):
         """
@@ -247,41 +283,62 @@ def run_alfredo():
         bot_logger.debug("Command invoked")
         discord_id = ctx.author.id
         command = "new_transaction"
-        # Check if user is registered
+        # Check if caller discord id is in db
         user, e = local_cache.get_user(discord_id=discord_id, parse=False)
         if e is not None:
-            await ctx.author.send(f"Error, cannot add transaction: {e}")
-            return
-        # Check a user has transactions ongoing
+            raise e
         transaction = local_cache.get_user_transactions(user=user, parse=True)
-        bot_logger.debug("Fetched user transactions")
+        bot_logger.debug("Fetched user transaction")
         if transaction:
-            # Check if a new transaction needs to be started with user
             await ctx.author.send(
-                MAIN_CFG["messages"]["transaction_exists"].format(transaction=transaction)
+                # TODO Specify commands to be called here
+                "Transaction is in progress. Delete or Update using commands."
             )
-            confirm = await get_input(ctx=ctx, command=command,
-                                      model="transaction", data_key="confirm")
-            flag = confirm.get("confirm", "").lower()
-            await ctx.author.send(f"Got {flag} response!")
-            if flag == "y":
-                await ctx.author.send("Starting a new transaction")
-            tr_data = transaction.copy()
-        else:
-            # This should be abstracted to a function TODO
-            # Prompt for input
-            tr_data = await get_input(ctx=ctx, command=command, model="transaction",
-                                      rec_discord_id=False, include_extra=True)
-            # Validate input (parse numbers) TODO
-            # Add user level features fot the user input
-            tr_data["user_id"] = user.user_id
-            tr_data["currency"] = user.currency # Check for None?
-            bot_logger.debug("Transaction data prepared %s", tr_data)
-            # Write to db
-            msg, e = local_cache.create_transaction(tr_data)
-            if e is not None:
-                bot_logger.error("new_transaction() failed: %s", e)
+            return
+        await create_transaction(ctx, user=user, command=command)
+
+    @bot.command(aliases=("del_tr",))
+    async def delete_ong_transaction(ctx: commands.Context):
+        """
+        ### Deletes ongoing transaction 
+        """
+        bot_logger.debug("Command invoked")
+        discord_id = ctx.author.id
+        # Check if caller discord id is in db
+        user, e = local_cache.get_user(discord_id=discord_id, parse=False)
+        if e is not None:
+            raise e
+        # Get transaction as ORM obj
+        transaction = local_cache.get_user_transactions(user=user, parse=False)
+        if not transaction:
+            await ctx.author.send("No transactions located, can't delete")
+            return
+        # Delete transaction using cache class methods
+        e = local_cache.delete_row(transaction)
+        if e is not None:
+            msg = f"Error deleting transaction row: {e}"
+            bot_logger.error(msg)
             await ctx.author.send(msg)
+            return
+        await ctx.author.send("Transaction deletion - success!")
+
+
+    async def update_transaction(ctx: commands.Context, field: str, value: str):
+        """
+        Updates transaction using user input
+        """
+        bot_logger.debug("Command invoked")
+        discord_id = ctx.author.id
+        # Check if caller discord id is in db
+        user, e = local_cache.get_user(discord_id=discord_id, parse=False)
+        if e is not None:
+            raise e
+        # Check if field is valid
+        # Perform type conversion if needed
+            # alert on error
+        # Call cache method to update transation
+        # Inform user on outcome
+
     
     # This is where the bot is actually launched
     bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)

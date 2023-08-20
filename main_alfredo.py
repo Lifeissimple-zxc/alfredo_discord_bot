@@ -323,7 +323,8 @@ def run_alfredo():
         await ctx.author.send("Transaction deletion - success!")
 
 
-    async def update_transaction(ctx: commands.Context, field: str, value: str):
+    @bot.command(aliases=("upd_tr",))
+    async def update_transaction(ctx: commands.Context, field: str, data: str):
         """
         Updates transaction using user input
         """
@@ -334,11 +335,33 @@ def run_alfredo():
         if e is not None:
             raise e
         # Check if field is valid
+        allowed_fields = input_controller.create_prompt_keys(model="transaction",
+                                                             mode="all")
+        if field not in allowed_fields and field is not None:
+            # TODO this should be handled in a generic fashion
+            await ctx.author.send(f"{field} can't be updated by users")
+            return 
         # Perform type conversion if needed
-            # alert on error
+        data, e = input_controller.parse_input(model="transaction",
+                                               field=field, data=data)
+        if e is not None:
+            # TODO this should be handled in a generic fashion too
+            await ctx.author.send(f"{data} is not valid for {field}: {e}")
+            return
+        # Fetch transation that to apply updates to
+        transaction = local_cache.get_user_transactions(user=user, parse=False)
+        if not transaction:
+            # TODO Generic handling?
+            await ctx.author.send("No transactions located, can't update")
+            return
         # Call cache method to update transation
-        # Inform user on outcome
-
+        e = local_cache.update_transaction(update={field: data},
+                                           transaction=transaction)
+        if e is not None:
+            msg = f"DB Data update failed for transaction: {e}"
+            bot_logger.error(msg)
+            await ctx.author.send(msg)
+        await ctx.author.send("Transaction data updated!")
     
     # This is where the bot is actually launched
     bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)

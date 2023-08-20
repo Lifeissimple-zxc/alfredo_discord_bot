@@ -43,6 +43,7 @@ class InputValidator:
     def parse_input(self, model: str, field: str, data: str) -> tuple:
         """
         Parses input to the target type defined by field key for model in schema
+        :return: tuple(converted data, err if any)
         """
         res, e = self._convert_type(data=data,
                                     target_type=self.types_schema[model][field])

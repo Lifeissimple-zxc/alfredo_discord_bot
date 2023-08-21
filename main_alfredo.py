@@ -44,10 +44,15 @@ def run_alfredo():
     async def on_command_error(ctx: commands.Context, error: Exception):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.message.author.send(MAIN_CFG["error_messages"]["missing_input"])
-        if isinstance(error, ex.UserNotRegisteredError):
-            await ctx.message.author.send(
-                MAIN_CFG["error_messages"]["missing_input"].format(cmd=error.cmd)
-            )
+        # All the raises inside the bot's body are wrapped with CommandInvokeError
+        elif isinstance(error, commands.CommandInvokeError):
+            cause = error.__cause__
+            if isinstance(cause, ex.UserNotRegisteredError):
+                bot_logger.info("Unregistered %s tried to invoke %s",
+                                ctx.message.author.id, ctx.invoked_with)
+                await ctx.message.author.send(
+                    MAIN_CFG["error_messages"]["user_not_registered"].format(cmd=ctx.invoked_with)
+                )
     
     ### Commands to read data iteratively
 
@@ -247,7 +252,7 @@ def run_alfredo():
         # Check if caller discord id is in db
         user, e = local_cache.get_user(discord_id=discord_id, parse=False)
         if e is not None:
-            raise e
+            raise ex.UserNotRegisteredError(msg=str(e))
         
         transaction = local_cache.get_user_transactions(user=user, parse=True) 
         if transaction:
@@ -286,7 +291,7 @@ def run_alfredo():
         # Check if caller discord id is in db
         user, e = local_cache.get_user(discord_id=discord_id, parse=False)
         if e is not None:
-            raise e
+            raise ex.UserNotRegisteredError(msg=str(e))
         transaction = local_cache.get_user_transactions(user=user, parse=True)
         bot_logger.debug("Fetched user transaction")
         if transaction:
@@ -307,7 +312,7 @@ def run_alfredo():
         # Check if caller discord id is in db
         user, e = local_cache.get_user(discord_id=discord_id, parse=False)
         if e is not None:
-            raise e
+            raise ex.UserNotRegisteredError(msg=str(e))
         # Get transaction as ORM obj
         transaction = local_cache.get_user_transactions(user=user, parse=False)
         if not transaction:
@@ -333,7 +338,7 @@ def run_alfredo():
         # Check if caller discord id is in db
         user, e = local_cache.get_user(discord_id=discord_id, parse=False)
         if e is not None:
-            raise e
+            raise ex.UserNotRegisteredError(msg=str(e))
         # Check if field is valid
         allowed_fields = input_controller.create_prompt_keys(model="transaction",
                                                              mode="all")

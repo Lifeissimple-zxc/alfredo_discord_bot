@@ -7,7 +7,6 @@ class UserNotRegisteredError(Exception):
     Custom expection to be raised when a user invoving a command
     is not registered in the database
     """
-    def __init__(self, msg: str, cmd: str):
+    def __init__(self, msg: str):
         """Instantiates the error"""
         super().__init__(msg)
-        self.cmd = cmd

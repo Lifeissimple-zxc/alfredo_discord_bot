@@ -13,7 +13,7 @@ from alfredo_lib.alfredo_deps import (
     validator 
 )
 from alfredo_lib.local_persistence import models
-from alfredo_lib.bot import ex
+from alfredo_lib.bot import ex, cogs
 from alfredo_lib import MAIN_CFG, ENV_VARS
 
 # Logging boilerplate
@@ -53,6 +53,20 @@ def run_alfredo():
                 await ctx.message.author.send(
                     MAIN_CFG["error_messages"]["user_not_registered"].format(cmd=ctx.invoked_with)
                 )
+    
+    @bot.command()
+    async def load_cogs(ctx: commands.Context):
+        """
+        Secret command to loading cogs
+        """ 
+        # TODO add admin check here, should come from config
+        if ctx.author.id not in {194543162604126208}:
+            bot_logger.warning("User %s tried to load cogs", ctx.author.id)
+            return
+        # TODO make the command hidden
+        await bot.add_cog(cogs.AccountCog(bot=bot, local_cache=local_cache,
+                                          input_controller=input_controller))
+        bot_logger.debug("Loaded AccountCog")
     
     ### Commands to read data iteratively
 
@@ -146,34 +160,34 @@ def run_alfredo():
         return res
 
     ### Commands that users are expected to call
-    @bot.command()
-    async def register(ctx: commands.Context):
-        command = "register" #TODO make it a config
-        reg_data = await get_input(ctx=ctx, command=command,
-                                   model="user", include_extra=True)
+    # @bot.command()
+    # async def register(ctx: commands.Context):
+    #     command = "register" #TODO make it a config
+    #     reg_data = await get_input(ctx=ctx, command=command,
+    #                                model="user", include_extra=True)
         
-        # Validate command and send message to the user on success?
-        # TODO Exception uncaught here
-        missing = input_controller.validate_keys(user_input=reg_data, model="user")
-        if missing:
-            await ctx.message.author.send(
-                f"Cannot run {command}. Missing fields: {missing}"
-            )
-            return
-        await ctx.message.author.send(f"All fields are present. Running {command}.")
+    #     # Validate command and send message to the user on success?
+    #     # TODO Exception uncaught here
+    #     missing = input_controller.validate_keys(user_input=reg_data, model="user")
+    #     if missing:
+    #         await ctx.message.author.send(
+    #             f"Cannot run {command}. Missing fields: {missing}"
+    #         )
+    #         return
+    #     await ctx.message.author.send(f"All fields are present. Running {command}.")
 
-        user_msg, e = local_cache.create_user(reg_data)
-        username = reg_data["username"]
-        # Check for error
-        if e is not None:
-            await ctx.message.author.send(
-                f"{command} failed for {username}: {user_msg}"
-            )
-            return
-        # Give feedback to a user
-        await ctx.message.author.send(
-            f"User {username} registered with discord_id {reg_data['discord_id']}"
-        )
+    #     user_msg, e = local_cache.create_user(reg_data)
+    #     username = reg_data["username"]
+    #     # Check for error
+    #     if e is not None:
+    #         await ctx.message.author.send(
+    #             f"{command} failed for {username}: {user_msg}"
+    #         )
+    #         return
+    #     # Give feedback to a user
+    #     await ctx.message.author.send(
+    #         f"User {username} registered with discord_id {reg_data['discord_id']}"
+    #     )
     
     @bot.command()
     async def whoami(ctx: commands.Context):
@@ -182,11 +196,11 @@ def run_alfredo():
         #TODO how can we have this logging call embedded into the commands?
         #TODO mb a decorator in the bot class?
         bot_logger.debug("User %s invoked %s command", discord_id, "get_my_data")
-        # Read from DB
+        # Read from DB, generally we parse here
+        # So the second item might not be an exception
         user_data, user_msg = local_cache.get_user(discord_id)
-        if user_msg:
-            await ctx.message.author.send(user_msg)
-            return
+        if user_msg is not None:
+            raise ex.UserNotRegisteredError(msg=user_msg)
         await ctx.message.author.send(f"Your data:\n{user_data}")
 
     @bot.command(aliases=("uud","update"))
@@ -200,6 +214,12 @@ def run_alfredo():
         discord_id = ctx.author.id
         bot_logger.debug("%s user invoked %s command with args: %s, %s",
                          discord_id, command, field, value)
+        # TODO this function is too long
+        # TODO can we re-use the user object returned from local_cache.get_user?
+        # Check for user's eligiblity to edit this
+        _, e = local_cache.get_user(discord_id=discord_id, parse=False)
+        if e is not None:
+            raise ex.UserNotRegisteredError(msg=str(e))
         # Check if users are expected to update this field  
         if (field not in input_controller.create_prompt_keys(model="user", mode="all")
             and field is not None):

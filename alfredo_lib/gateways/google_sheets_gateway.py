@@ -56,7 +56,7 @@ class GoogleSheetAsyncGateway:
         )
         return resp
     
-    async def open_sheet(sheet_id: str, sheet_tab_name: str) -> WorkSheet:
+    async def open_ws(self, sheet_id: str, sheet_tab_name: str) -> WorkSheet:
         pass
     
 

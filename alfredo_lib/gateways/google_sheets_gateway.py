@@ -89,7 +89,7 @@ class GoogleSheetAsyncGateway:
         bot_logger.debug("Prepared request")
         return await self._make_request(req=req)
     
-    async def tab_name_to_tab_id(self, sheet_id: str, tab_name: str):
+    async def _tab_name_to_tab_id(self, sheet_id: str, tab_name: str):
         """
         Mapper converting tab name to tab id
         """
@@ -104,10 +104,8 @@ class GoogleSheetAsyncGateway:
         if tab is None:
             msg = f"No tab {tab_name} is sheet {sheet_id}"
             bot_logger.debug("No tab %s is sheet %s", tab_name, sheet_id)
-            return None, KeyError(msg)
+            return None, ValueError(msg)
         return tab["sheetId"], None
-        
-
 
     @staticmethod
     def _process_sheet_response(sheet_data: list, header_rownum: int,
@@ -168,19 +166,40 @@ class GoogleSheetAsyncGateway:
             return df
         # Typecasting TODO
 
-    async def clear_data(self, sheet_id: str, tab_name: str, cols_len: int):
+    async def clear_data(self, sheet_id: str, tab_name: str, cell_range: str):
         """
         TODO return type hint
-        Method for overriding data. Does not delete rows.
+        Method for deleting cell data. Does not delete rows.
         """
-        sheet_range = f"{tab_name}!A:{num_to_sheet_range(num=cols_len)}"
-        print(sheet_range)
+        sheet_range = f"{tab_name}!{cell_range}"
         req = self.sheet_service.spreadsheets.values.clear(
             spreadsheetId=sheet_id,
             range=sheet_range
         )
         resp = await self._make_request(req=req)
         return resp
+    
+    @staticmethod
+    def __delete_rows_params_to_body(sheet_id: str, tab_id: str,
+                                     start: int, end: int) -> dict:
+        """
+        Mapper converting delete rows params to a request body that Google
+        api understands.
+        """
+        return {
+            "requests": [
+                {
+                    "deleteDimension": {
+                        "range": {
+                            "sheetId": tab_id,
+                            "dimension": "ROWS",
+                            "startIndex": start,
+                            "endIndex": end
+                        }    
+                    }
+                }
+            ]
+        }
     
     async def delete_rows(self, sheet_id: str, tab_name: str,
                           start: Optional[int] = None,
@@ -189,6 +208,96 @@ class GoogleSheetAsyncGateway:
         TODO return type hint
         Deletes rows from a tab
         """
+        tab_id, e = await self._tab_name_to_tab_id(sheet_id=sheet_id,
+                                                   tab_name=tab_name)
+        if e is not None:
+            bot_logger.error("Rows deletion failed. Details: %s", e)
+            return None, e
+        bot_logger.debug("tab %s is found in sheet %s", tab_name, sheet_id)
+        req_body = self.__delete_rows_params_to_body(
+            sheet_id=sheet_id, tab_id=tab_id,
+            start=start, end=end
+        )
+        bot_logger.debug("Prepared delete rows body")
+        req = self.sheet_service.spreadsheets.batchUpdate(
+            spreadsheetId=sheet_id,
+            json=req_body
+        )
+        resp = await self._make_request(req=req)
+        return resp, None
+    
+    @staticmethod
+    def _df_to_update_range(data: pl.DataFrame, start_row: int):
+        """
+        Creates update range in AA:ZZ notation based on data & start row
+        """
+        return f"A{start_row}:{num_to_sheet_range(len(data.columns))}"
+    
+    @staticmethod
+    def __paste_params_to_body(value_range: dict):
+        """
+        Mapper converting paste params to request body
+        """
+        return {
+            "valueInputOption": "RAW",
+            "data": value_range,
+            "includeValuesInResponse": False,
+            "responseValueRenderOption": "UNFORMATTED_VALUE",
+            "responseDateTimeRenderOption": "SERIAL_NUMBER"
+        }
+    
+    async def paste_data(self, sheet_id: str, tab_name: str,
+                         start_row: int, data: pl.DataFrame,
+                         include_header: Optional[bool] = None):
+        """
+        Pastes data to the sheet. Overrides data already existing in the sheet.
+        :param sheet_id: id of the spreadsheet
+        :param tab_name: tab where to paste
+        :param start_row: where where we paste the data
+        :param data: data to paste to the sheet
+        """
+        if include_header is None:
+            include_header = True
+        #TODO type hints 
+        # Delete already existing data before pasting
+        paste_range = self._df_to_update_range(data=data, start_row=start_row)
+        # naive assumption, no resp check
+        await self.clear_data(sheet_id=sheet_id, tab_name=tab_name,
+                              cell_range=paste_range)
+        
+        # TODO abstract to a function!
+        # Convert df to a list of lists bc google expects an array
+        data_update = data.to_numpy().tolist()
+        # TODO make it optional, only when header is included?
+        if include_header:
+            data_update = [data.columns] + data_update
+        print(data_update)
+        # Convert data to value range
+        sheet_range = f"{tab_name}!{paste_range}" 
+        value_range = {
+            "range": sheet_range,
+            "majorDimension": "ROWS",
+            "values": data_update
+        } 
+        # Convert data to a list of lists
+        # TODO refactor this a bit more!
+        bot_logger.debug("Pasting data to %s using range %s",
+                         tab_name, paste_range)
+        req = self.sheet_service.spreadsheets.values.update(
+            spreadsheetId=sheet_id,
+            range=sheet_range,
+            json=value_range,
+
+            valueInputOption="RAW",
+            includeValuesInResponse=False,
+            responseValueRenderOption="UNFORMATTED_VALUE",
+            responseDateTimeRenderOption="SERIAL_NUMBER"
+        )
+        return await self._make_request(req=req)
+
+
+        
+
 
     
         

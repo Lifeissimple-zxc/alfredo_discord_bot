@@ -180,8 +180,7 @@ class GoogleSheetAsyncGateway:
         return resp
     
     @staticmethod
-    def __delete_rows_params_to_body(sheet_id: str, tab_id: str,
-                                     start: int, end: int) -> dict:
+    def __delete_rows_params_to_body(tab_id: str, start: int, end: int) -> dict:
         """
         Mapper converting delete rows params to a request body that Google
         api understands.
@@ -201,24 +200,24 @@ class GoogleSheetAsyncGateway:
             ]
         }
     
-    async def delete_rows(self, sheet_id: str, tab_name: str,
-                          start: Optional[int] = None,
-                          end: Optional[int] = None):
+    async def delete_rows(self, sheet_id: str, tab_name: str, end: int,
+                          start: Optional[int] = None):
         """
         TODO return type hint
         Deletes rows from a tab
         """
+        if start is None:
+            start = 1
+
         tab_id, e = await self._tab_name_to_tab_id(sheet_id=sheet_id,
                                                    tab_name=tab_name)
         if e is not None:
             bot_logger.error("Rows deletion failed. Details: %s", e)
             return None, e
         bot_logger.debug("tab %s is found in sheet %s", tab_name, sheet_id)
-        req_body = self.__delete_rows_params_to_body(
-            sheet_id=sheet_id, tab_id=tab_id,
-            start=start, end=end
-        )
-        bot_logger.debug("Prepared delete rows body")
+        req_body = self.__delete_rows_params_to_body(tab_id=tab_id,
+                                                     start=start, end=end)
+        bot_logger.debug("Deleting rows using body: %s", req_body)
         req = self.sheet_service.spreadsheets.batchUpdate(
             spreadsheetId=sheet_id,
             json=req_body
@@ -238,6 +237,7 @@ class GoogleSheetAsyncGateway:
         """
         Mapper converting paste params to request body
         """
+        #TODO make sure it's used or delete
         return {
             "valueInputOption": "RAW",
             "data": value_range,
@@ -271,9 +271,8 @@ class GoogleSheetAsyncGateway:
         # TODO make it optional, only when header is included?
         if include_header:
             data_update = [data.columns] + data_update
-        print(data_update)
         # Convert data to value range
-        sheet_range = f"{tab_name}!{paste_range}" 
+        sheet_range = f"{tab_name}!{paste_range}"
         value_range = {
             "range": sheet_range,
             "majorDimension": "ROWS",
@@ -294,6 +293,56 @@ class GoogleSheetAsyncGateway:
             responseDateTimeRenderOption="SERIAL_NUMBER"
         )
         return await self._make_request(req=req)
+    
+    @staticmethod
+    def _compute_number_of_rows_to_drop(current_len: int, new_len: int,
+                                        row_limit: int):
+        """
+        Computes number of rows to delete to comply with row_limit
+        """
+        bot_logger.debug("Computing how many rows to drop")
+        bot_logger.debug("current: %s, new: %s, limit %s",
+                         current_len, new_len, row_limit)
+        to_delete = 0
+        if (tot_len := (current_len + new_len)) > row_limit:
+            # End of the range is exclusive so doing +1
+            to_delete = tot_len - row_limit
+        return to_delete
+
+    async def append_data(self, sheet_id: str, tab_name: str,
+                          data: pl.DataFrame, row_limit: int):
+        # TODO row limit should be pulled from config
+        """
+        ### Appends data data accounting for row_limit not to overload sheet
+        :param TODO:
+        :return: TODO
+        """
+        # Get current data + check for errorrs
+        curr_data = await self.read_sheet(sheet_id=sheet_id,
+                                          tab_name=tab_name,
+                                          as_df=True)
+        # TODO error check (read_sheet needs to be updated)
+        current_len = len(curr_data)
+        new_len = len(data)
+        to_delete = self._compute_number_of_rows_to_drop(
+            current_len=current_len, new_len=new_len,
+            row_limit=row_limit
+        )
+        bot_logger.debug("Have to delete %s rows", to_delete)
+
+        if to_delete > 0:
+            # End of the range is exclusive so doing +1
+            _, _ = await self.delete_rows(sheet_id=sheet_id,
+                                          tab_name=tab_name,
+                                          end=to_delete+1)
+            # Add one more row here TODO
+        # To delete is inflated, correcting here
+        # TODO 26 Sept continue from the above :UP:
+        paste_pos = current_len - to_delete + 2
+        bot_logger.debug("Appending at %s", paste_pos)
+        return await self.paste_data(sheet_id=sheet_id, tab_name=tab_name,
+                                     start_row=paste_pos, data=data,
+                                     include_header=False)
 
 
         

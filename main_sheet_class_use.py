@@ -38,11 +38,19 @@ async def main():
     print(sheet_data)
 
     # Paste to a new tab
-    resp = await sheets.paste_data(sheet_id=SAMPLE_SPREADSHEET_ID,
-                                   tab_name=SAMPLE_TAB_PASTE,
-                                   start_row=1,
-                                   data=sheet_data)
+    # resp = await sheets.paste_data(sheet_id=SAMPLE_SPREADSHEET_ID,
+    #                                tab_name=SAMPLE_TAB_PASTE,
+    #                                start_row=1,
+    #                                data=sheet_data)
+    # print(resp)
+
+    # Append to a new tab
+    resp = await sheets.append_data(sheet_id=SAMPLE_SPREADSHEET_ID,
+                                    tab_name=SAMPLE_TAB_APPEND,
+                                    data=sheet_data,
+                                    row_limit=10)
     print(resp)
+    
 
 
 

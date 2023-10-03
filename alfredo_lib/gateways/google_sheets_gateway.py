@@ -7,6 +7,7 @@ from typing import Optional
 
 import aiogoogle
 import polars as pl
+from aiogoogle import models as aiogoogle_models
 from aiogoogle.auth import creds
 
 from alfredo_lib import MAIN_CFG
@@ -259,6 +260,16 @@ class GoogleSheetAsyncGateway:
             "responseDateTimeRenderOption": "SERIAL_NUMBER"
         }
     
+    @staticmethod
+    def _df_to_sheet_update(data: pl.DataFrame, include_header: bool) -> list:
+        """
+        Mapper converting df to a 2d list that Google understands
+        """
+        data_update = data.to_numpy().tolist()
+        if include_header:
+            data_update = [data.columns] + data_update
+        return data_update
+    
     async def paste_data(self, sheet_id: str, tab_name: str,
                          start_row: int, data: pl.DataFrame,
                          include_header: Optional[bool] = None):
@@ -278,12 +289,10 @@ class GoogleSheetAsyncGateway:
         await self.clear_data(sheet_id=sheet_id, tab_name=tab_name,
                               cell_range=paste_range)
         
-        # TODO abstract to a function!
         # Convert df to a list of lists bc google expects an array
-        data_update = data.to_numpy().tolist()
-        # TODO make it optional, only when header is included?
-        if include_header:
-            data_update = [data.columns] + data_update
+        data_update = self._df_to_sheet_update(
+            data=data, include_header=include_header
+        )
         # Convert data to value range
         sheet_range = f"{tab_name}!{paste_range}"
         value_range = {
@@ -320,49 +329,30 @@ class GoogleSheetAsyncGateway:
         if (tot_len := (current_len + new_len)) > row_limit:
             to_delete = tot_len - row_limit
         return to_delete
-
-    async def append_data(self, sheet_id: str, tab_name: str,
-                          data: pl.DataFrame, row_limit: int):
-        # TODO row limit should be pulled from config
+    
+    @staticmethod
+    def _sheet_update_and_range_to_value_range(sheet_range: str,
+                                               data_update: list):
         """
-        ### Appends data data accounting for row_limit not to overload sheet
-        :param TODO:
-        :return: TODO
+        Mapper converting sheet data and data update
+        to a value range JSON body
         """
-        # Get current data + check for errorrs
-        curr_data = await self.read_sheet(sheet_id=sheet_id,
-                                          tab_name=tab_name,
-                                          as_df=True)
-        # TODO error check (read_sheet needs to be updated)
-        current_len = len(curr_data)
-        new_len = len(data)
-        to_delete = self._compute_number_of_rows_to_drop(
-            current_len=current_len, new_len=new_len,
-            row_limit=row_limit
-        )
-        bot_logger.debug("Have to delete %s rows", to_delete)
+        return {
+            "range": sheet_range,
+            "majorDimension": "ROWS",
+            "values": data_update
+        }
 
-        if to_delete > 0:
-            # End of the range is exclusive so doing +1
-            _, _ = await self.delete_rows(sheet_id=sheet_id,
-                                          tab_name=tab_name,
-                                          end=to_delete+1)
-            
-            # Add one more row here TODO
-        # To delete is inflated, correcting here
-        # TODO 26 Sept continue from the above :UP:
-        paste_pos = current_len - to_delete + 2
-        bot_logger.debug("Appending at %s", paste_pos)
-        return await self.paste_data(sheet_id=sheet_id, tab_name=tab_name,
-                                     start_row=paste_pos, data=data,
-                                     include_header=False)
     
     async def append_data_native(self, sheet_id: str, tab_name: str,
-                                 data: pl.DataFrame, row_limit: int):
+                                 data: pl.DataFrame, row_limit: int,
+                                 include_header: Optional[bool] = None):
         """
         Uses native append Method of the Gsheet API to add new rows to
         the sheet.
         """
+        if include_header is None:
+            include_header = False
         # Get current data + check for errorrs
         curr_data = await self.read_sheet(sheet_id=sheet_id,
                                           tab_name=tab_name,
@@ -383,14 +373,31 @@ class GoogleSheetAsyncGateway:
                                           end=to_delete+1)
         paste_pos = current_len - to_delete + 2
         # Prepare append request
-        data_update = data.to_numpy().tolist()
+        data_update = self._df_to_sheet_update(
+            data=data, include_header=include_header
+        )
         paste_range = self._df_to_update_range(data=data, start_row=paste_pos)
         sheet_range = f"{tab_name}!{paste_range}"
-        value_range = {
-            "range": sheet_range,
-            "majorDimension": "ROWS",
-            "values": data_update
-        } 
+        value_range = self._sheet_update_and_range_to_value_range(
+            sheet_range=sheet_range, data_update=data_update
+        )
+        req = self._prepare_append_values_req(
+            sheet_id=sheet_id, sheet_range=sheet_range,
+            value_range=value_range
+        )
+        # Execute append request
+        bot_logger.debug("Appending Natively")
+        return await self._make_request(req=req)
+    
+    def _prepare_append_values_req(
+        self,
+        sheet_id: str, 
+        sheet_range: str,
+        value_range: dict
+    ) -> aiogoogle_models.Request:
+        """
+        Prepares append request to be sent to Google
+        """
         req = self.sheet_service.spreadsheets.values.append(
             spreadsheetId=sheet_id,
             range=sheet_range,
@@ -402,32 +409,11 @@ class GoogleSheetAsyncGateway:
             responseValueRenderOption="UNFORMATTED_VALUE",
             responseDateTimeRenderOption="SERIAL_NUMBER"
         )
-        # Execute append request
-        bot_logger.debug("Appending Natively")
-        return await self._make_request(req=req)
-        
-
-
-        
-
-
-    
-        
+        return req
 
 
 
-
-
-
-# TODO unite it alll under a class
-# TODO worksheet???
-
-
-# def sheet_to_df():
-#     pass
-
-# def paste_rows():
-#     pass
-
-# def append_rows():
-#     pass
+#TODO Oct 3 2023:
+# Add functions to add new tabs (this is needed for bot to automatically add tracking tabs)
+# Add more classes to group code (i.e. mapper class)
+# Start calling functions of this class in bot

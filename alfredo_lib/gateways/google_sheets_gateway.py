@@ -79,7 +79,7 @@ class GoogleSheetAsyncGateway:
         resp = await self.gsheet_client.as_service_account(req)
         return resp
     
-    async def get_sheet_properties(self, sheet_id: str):
+    async def _get_sheet_properties(self, sheet_id: str):
         """
         Fetches sheet data via a get request
         """
@@ -89,18 +89,24 @@ class GoogleSheetAsyncGateway:
         bot_logger.debug("Prepared request")
         return await self._make_request(req=req)
     
-    async def _tab_name_to_tab_id(self, sheet_id: str, tab_name: str):
+    @staticmethod
+    def _parse_raw_properties(sheet_properties: dict):
         """
-        Mapper converting tab name to tab id
+        Mapper converting raw response to from Google Sheets
+        to a dict of {tab_name: properties} form
         """
-        sheet_properties = await self.get_sheet_properties(sheet_id=sheet_id)
-        bot_logger.debug("Got sheet properties from the API")
-        all_tabs_data = {
+        return {
             tab["properties"]["title"]: tab["properties"]
             for tab in sheet_properties["sheets"]
         }
-        bot_logger.debug("Rearranged tab data to a simpler dict for vlookups")
-        tab = all_tabs_data.get(tab_name, None)
+
+    
+    async def _tab_name_to_tab_id(self, sheet_id: str, tab_name: str,
+                                  sheet_tabs_data: dict):
+        """
+        Mapper converting tab name to tab id
+        """
+        tab = sheet_tabs_data.get(tab_name, None)
         if tab is None:
             msg = f"No tab {tab_name} is sheet {sheet_id}"
             bot_logger.debug("No tab %s is sheet %s", tab_name, sheet_id)
@@ -206,11 +212,18 @@ class GoogleSheetAsyncGateway:
         TODO return type hint
         Deletes rows from a tab
         """
+        # Defaulting to 1 because zero is usually a header row
         if start is None:
             start = 1
 
-        tab_id, e = await self._tab_name_to_tab_id(sheet_id=sheet_id,
-                                                   tab_name=tab_name)
+        sheet_properties = await self._get_sheet_properties(sheet_id=sheet_id)
+        sheet_tabs_data = self._parse_raw_properties(
+            sheet_properties=sheet_properties
+        )
+        tab_id, e = await self._tab_name_to_tab_id(
+            sheet_id=sheet_id, tab_name=tab_name,
+            sheet_tabs_data=sheet_tabs_data
+        )
         if e is not None:
             bot_logger.error("Rows deletion failed. Details: %s", e)
             return None, e
@@ -305,7 +318,6 @@ class GoogleSheetAsyncGateway:
                          current_len, new_len, row_limit)
         to_delete = 0
         if (tot_len := (current_len + new_len)) > row_limit:
-            # End of the range is exclusive so doing +1
             to_delete = tot_len - row_limit
         return to_delete
 
@@ -335,6 +347,7 @@ class GoogleSheetAsyncGateway:
             _, _ = await self.delete_rows(sheet_id=sheet_id,
                                           tab_name=tab_name,
                                           end=to_delete+1)
+            
             # Add one more row here TODO
         # To delete is inflated, correcting here
         # TODO 26 Sept continue from the above :UP:
@@ -343,6 +356,56 @@ class GoogleSheetAsyncGateway:
         return await self.paste_data(sheet_id=sheet_id, tab_name=tab_name,
                                      start_row=paste_pos, data=data,
                                      include_header=False)
+    
+    async def append_data_native(self, sheet_id: str, tab_name: str,
+                                 data: pl.DataFrame, row_limit: int):
+        """
+        Uses native append Method of the Gsheet API to add new rows to
+        the sheet.
+        """
+        # Get current data + check for errorrs
+        curr_data = await self.read_sheet(sheet_id=sheet_id,
+                                          tab_name=tab_name,
+                                          as_df=True)
+        # TODO error check (read_sheet needs to be updated)
+        current_len = len(curr_data)
+        new_len = len(data)
+        to_delete = self._compute_number_of_rows_to_drop(
+            current_len=current_len, new_len=new_len,
+            row_limit=row_limit
+        )
+        bot_logger.debug("Have to delete %s rows", to_delete)
+
+        if to_delete > 0:
+            # End of the range is exclusive so doing +1
+            _, _ = await self.delete_rows(sheet_id=sheet_id,
+                                          tab_name=tab_name,
+                                          end=to_delete+1)
+        paste_pos = current_len - to_delete + 2
+        # Prepare append request
+        data_update = data.to_numpy().tolist()
+        paste_range = self._df_to_update_range(data=data, start_row=paste_pos)
+        sheet_range = f"{tab_name}!{paste_range}"
+        value_range = {
+            "range": sheet_range,
+            "majorDimension": "ROWS",
+            "values": data_update
+        } 
+        req = self.sheet_service.spreadsheets.values.append(
+            spreadsheetId=sheet_id,
+            range=sheet_range,
+            json=value_range,
+
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+            includeValuesInResponse=False,
+            responseValueRenderOption="UNFORMATTED_VALUE",
+            responseDateTimeRenderOption="SERIAL_NUMBER"
+        )
+        # Execute append request
+        bot_logger.debug("Appending Natively")
+        return await self._make_request(req=req)
+        
 
 
         

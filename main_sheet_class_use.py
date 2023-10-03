@@ -45,7 +45,7 @@ async def main():
     # print(resp)
 
     # Append to a new tab
-    resp = await sheets.append_data(sheet_id=SAMPLE_SPREADSHEET_ID,
+    resp = await sheets.append_data_native(sheet_id=SAMPLE_SPREADSHEET_ID,
                                     tab_name=SAMPLE_TAB_APPEND,
                                     data=sheet_data,
                                     row_limit=10)

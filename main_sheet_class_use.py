@@ -32,25 +32,19 @@ async def main():
     "Wrapper of async logic"
     # Read data
     await sheets.discover_sheet_service(api_version="v4")
-    sheet_data = await sheets.read_sheet(sheet_id=SAMPLE_SPREADSHEET_ID,
+    sheet_data, e = await sheets.read_sheet(sheet_id=SAMPLE_SPREADSHEET_ID,
                                          tab_name=SAMPLE_TAB_READ,
                                          as_df=True)
 
     # Append to a new tab
-    resp = await sheets.append_data_native(sheet_id=SAMPLE_SPREADSHEET_ID,
+    resp, e = await sheets.append_data_native(sheet_id=SAMPLE_SPREADSHEET_ID,
                                     tab_name=SAMPLE_TAB_APPEND,
                                     data=sheet_data,
                                     row_limit=10)
-    print(resp)
-    print(type(resp))
-    print(dir(resp))
 
     # Add a new tab
-    resp = await sheets.add_sheet(sheet_id=SAMPLE_SPREADSHEET_ID,
+    resp, e = await sheets.add_sheet(sheet_id=SAMPLE_SPREADSHEET_ID,
                                          title="someSheet")
-    print(resp)
-    print(type(resp))
-    print(dir(resp))
 
 
 

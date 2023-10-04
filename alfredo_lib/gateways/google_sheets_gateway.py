@@ -169,6 +169,19 @@ class GoogleSheetMapper:
         )
         return req
     
+    @staticmethod
+    def error_response_to_user_message(json_body: dict) -> str:
+        """
+        Parses response received on error to a user-friendly string
+        """
+        code = json_body.get("code", None)
+        message = json_body.get("message", None)
+        user_msg = "Google Sheets Error."
+        if code is not None:
+            user_msg = f"{user_msg} Code: {code}."
+        if message is not None:
+            user_msg = f"{user_msg} Message: {message}."
+        return user_msg
 
 class GoogleSheetAsyncGateway(GoogleSheetMapper):
     """
@@ -208,17 +221,24 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         )
         bot_logger.debug("Performed %s sheets service discovery", api_version)
 
-    async def _make_request(self, req: aiogoogle.models.Request):
+    async def _make_request(self, req: aiogoogle.models.Request) -> tuple:
         """
         Abstraction to simplifiy how we send requests to Gsheet backend
         """
         # TODO exceptions
         # TODO ratelimitting!!!
         # TODO errors for API requests
-        resp = await self.gsheet_client.as_service_account(req)
-        return resp
+        try:
+            resp = await self.gsheet_client.as_service_account(req)
+            return resp, None
+        # bad request?
+        except aiogoogle.excs.HTTPError as e:
+            bot_logger.debug("Request error. Request: %s. Response: %s",
+                             e.req.json, e.res.json)
+            user_msg = self.error_response_to_user_message(json_body=e.res.json)
+            return None, aiogoogle.excs.HTTPError(user_msg)
     
-    async def _get_sheet_properties(self, sheet_id: str):
+    async def _get_sheet_properties(self, sheet_id: str) -> tuple:
         """
         Fetches sheet data via a get request
         """
@@ -226,13 +246,17 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         req = self.sheet_service.spreadsheets.get(spreadsheetId=sheet_id,
                                                   includeGridData=False)
         bot_logger.debug("Prepared request")
-        return await self._make_request(req=req)
+        data, e = await self._make_request(req=req)
+        if e is not None:
+            bot_logger.error("Error fetching sheet properties: %s", e)
+            return None, e
+        return data, e
     
     async def read_sheet(self, sheet_id: str, tab_name: str,
                          header_rownum: Optional[int] = None,
                          header_offset: Optional[int] = None,
                          as_df: Optional[bool] = None,
-                         use_schema: Optional[bool] = None):
+                         use_schema: Optional[bool] = None) -> tuple:
         """
         Fetches data from spreadsheet to a python dict
         """
@@ -252,7 +276,10 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             majorDimension='ROWS'
         )
         bot_logger.debug("Prepared sheet reading request")
-        sheet_data = await self._make_request(req=data_req)
+        sheet_data, e = await self._make_request(req=data_req)
+        if e is not None:
+            bot_logger.error("Err reading sheet: %s", e)
+            return None, e
         # 2D array with rows here
         bot_logger.debug("Received data back")
         sheet_data = sheet_data["values"]
@@ -263,7 +290,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         bot_logger.debug("Accounted for header in sheet data")
         if not as_df:
             bot_logger.debug("Returning as 2d list")
-            return [header] + data
+            return [header] + data, None
         
         # Converting to polars
         bot_logger.debug("Converting to polars")
@@ -271,7 +298,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         df.columns = header
         if not use_schema:
             bot_logger.debug("use_schema is False, returning untyped")
-            return df
+            return df, None
         # Typecasting TODO
 
     async def clear_data(self, sheet_id: str, tab_name: str, cell_range: str):
@@ -284,8 +311,11 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             spreadsheetId=sheet_id,
             range=sheet_range
         )
-        resp = await self._make_request(req=req)
-        return resp
+        resp, e = await self._make_request(req=req)
+        if e is not None:
+            bot_logger.error("Err cleaning data: %s", e)
+            return None, e
+        return resp, e
     
     async def delete_rows(self, sheet_id: str, tab_name: str, end: int,
                           start: Optional[int] = None):
@@ -316,8 +346,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             spreadsheetId=sheet_id,
             json=req_body
         )
-        resp = await self._make_request(req=req)
-        return resp, None
+        return await self._make_request(req=req)
 
     async def paste_data(self, sheet_id: str, tab_name: str,
                          start_row: int, data: pl.DataFrame,
@@ -440,5 +469,4 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
 
 
 #TODO Oct 3 2023:
-# Add more classes to group code (i.e. mapper class)
 # Start calling functions of this class in bot

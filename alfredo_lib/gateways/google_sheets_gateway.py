@@ -20,19 +20,157 @@ SHEET_SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-def num_to_sheet_range(num: int) -> str:
+class GoogleSheetMapper:
     """
-    Mapper converting col number to a spreadsheet column
+    Class encapsulates mappers that are used by GoogleSheetAsyncGateway
     """
-    bot_logger.debug("Preparing sheet range from num %s", num)
-    rem, layers = num % 26, num // 26
-    bot_logger.debug("Rem: %s, layers: %s", rem, layers)
-    first = ""
-    if layers > 0:
-        first = chr(65+layers-1)
-    return f"{first}{chr(65+rem-1)}"
 
-class GoogleSheetAsyncGateway:
+    @staticmethod
+    def num_to_sheet_range(num: int) -> str:
+        """
+        Mapper converting col number to a spreadsheet column
+        """
+        bot_logger.debug("Preparing sheet range from num %s", num)
+        rem, layers = num % 26, num // 26
+        bot_logger.debug("Rem: %s, layers: %s", rem, layers)
+        first = ""
+        if layers > 0:
+            first = chr(65+layers-1)
+        return f"{first}{chr(65+rem-1)}"
+    
+    @staticmethod
+    async def _tab_name_to_tab_id(sheet_id: str, tab_name: str,
+                                  sheet_tabs_data: dict):
+        """
+        Mapper converting tab name to tab id
+        """
+        tab = sheet_tabs_data.get(tab_name, None)
+        if tab is None:
+            msg = f"No tab {tab_name} is sheet {sheet_id}"
+            bot_logger.debug("No tab %s is sheet %s", tab_name, sheet_id)
+            return None, ValueError(msg)
+        return tab["sheetId"], None
+    
+    @staticmethod
+    def _parse_raw_properties(sheet_properties: dict):
+        """
+        Mapper converting raw response to from Google Sheets
+        to a dict of {tab_name: properties} form
+        """
+        return {
+            tab["properties"]["title"]: tab["properties"]
+            for tab in sheet_properties["sheets"]
+        }
+
+    @staticmethod
+    def _process_sheet_response(sheet_data: list, header_rownum: int,
+                                header_offset: int) -> tuple:
+        """
+        Splits sheet_data into header and data
+        accounting for header_rownum and header_offset
+        """
+        header_index = header_rownum-1
+        header_row = sheet_data[header_index]
+        # Drop rows we want to skip based on params
+        del sheet_data[header_index:header_index+1+header_offset]
+        return header_row, sheet_data
+    
+    @staticmethod
+    def _delete_rows_params_to_body(tab_id: str, start: int, end: int) -> dict:
+        """
+        Mapper converting delete rows params to a request body that Google
+        api understands.
+        """
+        return {
+            "requests": [
+                {
+                    "deleteDimension": {
+                        "range": {
+                            "sheetId": tab_id,
+                            "dimension": "ROWS",
+                            "startIndex": start,
+                            "endIndex": end
+                        }    
+                    }
+                }
+            ]
+        }
+    
+    def _df_to_update_range(self, data: pl.DataFrame, start_row: int):
+        """
+        Creates update range in AA:ZZ notation based on data & start row
+        """
+        return f"A{start_row}:{self.num_to_sheet_range(len(data.columns))}"
+    
+    @staticmethod
+    def _sheet_update_and_range_to_value_range(sheet_range: str,
+                                               data_update: list):
+        """
+        Mapper converting sheet data and data update
+        to a value range JSON body
+        """
+        return {
+            "range": sheet_range,
+            "majorDimension": "ROWS",
+            "values": data_update
+        }
+    
+    @staticmethod
+    def _df_to_sheet_update(data: pl.DataFrame, include_header: bool) -> list:
+        """
+        Mapper converting df to a 2d list that Google understands
+        """
+        data_update = data.to_numpy().tolist()
+        if include_header:
+            data_update = [data.columns] + data_update
+        return data_update
+    
+    @staticmethod
+    def _add_sheet_params_to_add_sheet_body(title: str, rows: int,
+                                            columns: int):
+        """
+        Creates a body for addShet request
+        """
+        return {
+            "requests": [
+                {
+                    "addSheet": {
+                        "properties": {
+                            "title": title,
+                            "gridProperties": {
+                                "rowCount": rows,
+                                "columnCount": columns
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    
+    def _prepare_append_values_req(
+        self,
+        sheet_id: str, 
+        sheet_range: str,
+        value_range: dict
+    ) -> aiogoogle_models.Request:
+        """
+        Prepares append request to be sent to Google
+        """
+        req = self.sheet_service.spreadsheets.values.append(
+            spreadsheetId=sheet_id,
+            range=sheet_range,
+            json=value_range,
+
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+            includeValuesInResponse=False,
+            responseValueRenderOption="UNFORMATTED_VALUE",
+            responseDateTimeRenderOption="SERIAL_NUMBER"
+        )
+        return req
+    
+
+class GoogleSheetAsyncGateway(GoogleSheetMapper):
     """
     Implements an async class for interacting with Gsheet API.
     It relies on a service account for authentication.
@@ -90,43 +228,6 @@ class GoogleSheetAsyncGateway:
         bot_logger.debug("Prepared request")
         return await self._make_request(req=req)
     
-    @staticmethod
-    def _parse_raw_properties(sheet_properties: dict):
-        """
-        Mapper converting raw response to from Google Sheets
-        to a dict of {tab_name: properties} form
-        """
-        return {
-            tab["properties"]["title"]: tab["properties"]
-            for tab in sheet_properties["sheets"]
-        }
-
-    
-    async def _tab_name_to_tab_id(self, sheet_id: str, tab_name: str,
-                                  sheet_tabs_data: dict):
-        """
-        Mapper converting tab name to tab id
-        """
-        tab = sheet_tabs_data.get(tab_name, None)
-        if tab is None:
-            msg = f"No tab {tab_name} is sheet {sheet_id}"
-            bot_logger.debug("No tab %s is sheet %s", tab_name, sheet_id)
-            return None, ValueError(msg)
-        return tab["sheetId"], None
-
-    @staticmethod
-    def _process_sheet_response(sheet_data: list, header_rownum: int,
-                                header_offset: int) -> tuple:
-        """
-        Splits sheet_data into header and data
-        accounting for header_rownum and header_offset
-        """
-        header_index = header_rownum-1
-        header_row = sheet_data[header_index]
-        # Drop rows we want to skip based on params
-        del sheet_data[header_index:header_index+1+header_offset]
-        return header_row, sheet_data
-
     async def read_sheet(self, sheet_id: str, tab_name: str,
                          header_rownum: Optional[int] = None,
                          header_offset: Optional[int] = None,
@@ -186,27 +287,6 @@ class GoogleSheetAsyncGateway:
         resp = await self._make_request(req=req)
         return resp
     
-    @staticmethod
-    def __delete_rows_params_to_body(tab_id: str, start: int, end: int) -> dict:
-        """
-        Mapper converting delete rows params to a request body that Google
-        api understands.
-        """
-        return {
-            "requests": [
-                {
-                    "deleteDimension": {
-                        "range": {
-                            "sheetId": tab_id,
-                            "dimension": "ROWS",
-                            "startIndex": start,
-                            "endIndex": end
-                        }    
-                    }
-                }
-            ]
-        }
-    
     async def delete_rows(self, sheet_id: str, tab_name: str, end: int,
                           start: Optional[int] = None):
         """
@@ -229,8 +309,8 @@ class GoogleSheetAsyncGateway:
             bot_logger.error("Rows deletion failed. Details: %s", e)
             return None, e
         bot_logger.debug("tab %s is found in sheet %s", tab_name, sheet_id)
-        req_body = self.__delete_rows_params_to_body(tab_id=tab_id,
-                                                     start=start, end=end)
+        req_body = self._delete_rows_params_to_body(tab_id=tab_id,
+                                                    start=start, end=end)
         bot_logger.debug("Deleting rows using body: %s", req_body)
         req = self.sheet_service.spreadsheets.batchUpdate(
             spreadsheetId=sheet_id,
@@ -238,38 +318,7 @@ class GoogleSheetAsyncGateway:
         )
         resp = await self._make_request(req=req)
         return resp, None
-    
-    @staticmethod
-    def _df_to_update_range(data: pl.DataFrame, start_row: int):
-        """
-        Creates update range in AA:ZZ notation based on data & start row
-        """
-        return f"A{start_row}:{num_to_sheet_range(len(data.columns))}"
-    
-    @staticmethod
-    def __paste_params_to_body(value_range: dict):
-        """
-        Mapper converting paste params to request body
-        """
-        #TODO make sure it's used or delete
-        return {
-            "valueInputOption": "RAW",
-            "data": value_range,
-            "includeValuesInResponse": False,
-            "responseValueRenderOption": "UNFORMATTED_VALUE",
-            "responseDateTimeRenderOption": "SERIAL_NUMBER"
-        }
-    
-    @staticmethod
-    def _df_to_sheet_update(data: pl.DataFrame, include_header: bool) -> list:
-        """
-        Mapper converting df to a 2d list that Google understands
-        """
-        data_update = data.to_numpy().tolist()
-        if include_header:
-            data_update = [data.columns] + data_update
-        return data_update
-    
+
     async def paste_data(self, sheet_id: str, tab_name: str,
                          start_row: int, data: pl.DataFrame,
                          include_header: Optional[bool] = None):
@@ -295,12 +344,9 @@ class GoogleSheetAsyncGateway:
         )
         # Convert data to value range
         sheet_range = f"{tab_name}!{paste_range}"
-        value_range = {
-            "range": sheet_range,
-            "majorDimension": "ROWS",
-            "values": data_update
-        } 
-        # Convert data to a list of lists
+        value_range = self._sheet_update_and_range_to_value_range(
+            sheet_range=sheet_range, data_update=data_update
+        )
         # TODO refactor this a bit more!
         bot_logger.debug("Pasting data to %s using range %s",
                          tab_name, paste_range)
@@ -329,20 +375,6 @@ class GoogleSheetAsyncGateway:
         if (tot_len := (current_len + new_len)) > row_limit:
             to_delete = tot_len - row_limit
         return to_delete
-    
-    @staticmethod
-    def _sheet_update_and_range_to_value_range(sheet_range: str,
-                                               data_update: list):
-        """
-        Mapper converting sheet data and data update
-        to a value range JSON body
-        """
-        return {
-            "range": sheet_range,
-            "majorDimension": "ROWS",
-            "values": data_update
-        }
-
     
     async def append_data_native(self, sheet_id: str, tab_name: str,
                                  data: pl.DataFrame, row_limit: int,
@@ -389,31 +421,24 @@ class GoogleSheetAsyncGateway:
         bot_logger.debug("Appending Natively")
         return await self._make_request(req=req)
     
-    def _prepare_append_values_req(
-        self,
-        sheet_id: str, 
-        sheet_range: str,
-        value_range: dict
-    ) -> aiogoogle_models.Request:
+    async def add_sheet(self, sheet_id: str, title: str, 
+                        rows: Optional[int] = None,
+                        columns: Optional[int] = None):
         """
-        Prepares append request to be sent to Google
+        Adds a new sheet to the spreadsheet
         """
-        req = self.sheet_service.spreadsheets.values.append(
-            spreadsheetId=sheet_id,
-            range=sheet_range,
-            json=value_range,
-
-            valueInputOption="RAW",
-            insertDataOption="INSERT_ROWS",
-            includeValuesInResponse=False,
-            responseValueRenderOption="UNFORMATTED_VALUE",
-            responseDateTimeRenderOption="SERIAL_NUMBER"
+        rows = rows or 1000
+        columns = columns or 1000
+        json_body = self._add_sheet_params_to_add_sheet_body(
+            title=title, rows=rows, columns=columns
         )
-        return req
-
+        req = self.sheet_service.spreadsheets.batchUpdate(
+            spreadsheetId=sheet_id,
+            json=json_body
+        )
+        return await self._make_request(req=req)
 
 
 #TODO Oct 3 2023:
-# Add functions to add new tabs (this is needed for bot to automatically add tracking tabs)
 # Add more classes to group code (i.e. mapper class)
 # Start calling functions of this class in bot

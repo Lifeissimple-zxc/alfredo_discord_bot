@@ -35,14 +35,6 @@ async def main():
     sheet_data = await sheets.read_sheet(sheet_id=SAMPLE_SPREADSHEET_ID,
                                          tab_name=SAMPLE_TAB_READ,
                                          as_df=True)
-    print(sheet_data)
-
-    # Paste to a new tab
-    # resp = await sheets.paste_data(sheet_id=SAMPLE_SPREADSHEET_ID,
-    #                                tab_name=SAMPLE_TAB_PASTE,
-    #                                start_row=1,
-    #                                data=sheet_data)
-    # print(resp)
 
     # Append to a new tab
     resp = await sheets.append_data_native(sheet_id=SAMPLE_SPREADSHEET_ID,
@@ -50,7 +42,15 @@ async def main():
                                     data=sheet_data,
                                     row_limit=10)
     print(resp)
-    
+    print(type(resp))
+    print(dir(resp))
+
+    # Add a new tab
+    resp = await sheets.add_sheet(sheet_id=SAMPLE_SPREADSHEET_ID,
+                                         title="someSheet")
+    print(resp)
+    print(type(resp))
+    print(dir(resp))
 
 
 

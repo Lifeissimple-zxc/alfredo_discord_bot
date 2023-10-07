@@ -11,6 +11,7 @@ from aiogoogle import models as aiogoogle_models
 from aiogoogle.auth import creds
 
 from alfredo_lib import MAIN_CFG
+from alfredo_lib.gateways.base import async_rps_limiter
 
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
@@ -20,11 +21,13 @@ SHEET_SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
+READ_REQUEST_TYPE = "r"
+WRITE_REQUEST_TYPE = "w"
+
 class GoogleSheetMapper:
     """
     Class encapsulates mappers that are used by GoogleSheetAsyncGateway
     """
-
     @staticmethod
     def num_to_sheet_range(num: int) -> str:
         """
@@ -188,7 +191,9 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
     Implements an async class for interacting with Gsheet API.
     It relies on a service account for authentication.
     """
-    def __init__(self, service_acc_path: str):
+    def __init__(self, service_acc_path: str,
+                 read_rps_limiter: async_rps_limiter.AsyncLimiter,
+                 write_rps_limter: async_rps_limiter.AsyncLimiter):
         """
         Instantiates the gateway
         """
@@ -197,6 +202,8 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         self.gsheet_client = aiogoogle.Aiogoogle(
             service_account_creds=self.raw_creds
         )
+        self.read_limiter = read_rps_limiter
+        self.write_limter = write_rps_limter
         bot_logger.debug("Instantiated GSheet Async Gateway")
 
     @staticmethod
@@ -221,17 +228,29 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         )
         bot_logger.debug("Performed %s sheets service discovery", api_version)
 
-    async def _make_request(self, req: aiogoogle.models.Request) -> tuple:
+    async def _make_request(self, req: aiogoogle.models.Request,
+                            req_type: str) -> tuple:
         """
         Abstraction to simplifiy how we send requests to Gsheet backend
         """
         # TODO exceptions
         # TODO ratelimitting!!!
         # TODO errors for API requests
+        
+        # Not wrapping to a separate func bc mapper has no access to limiters
+        if req_type == READ_REQUEST_TYPE:
+            limiter = self.read_limiter
+        elif req_type == WRITE_REQUEST_TYPE:
+            limiter = self.write_limter
+        else:
+            return None, ValueError(
+                f"Bad input for req_type: {req_type}. Need 'r' or 'w'"
+            )
+
         try:
-            resp = await self.gsheet_client.as_service_account(req)
-            return resp, None
-        # bad request?
+            async with limiter:
+                resp = await self.gsheet_client.as_service_account(req)
+                return resp, None
         except aiogoogle.excs.HTTPError as e:
             bot_logger.debug("Request error. Request: %s. Response: %s",
                              e.req.json, e.res.json)
@@ -246,7 +265,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         req = self.sheet_service.spreadsheets.get(spreadsheetId=sheet_id,
                                                   includeGridData=False)
         bot_logger.debug("Prepared request")
-        data, e = await self._make_request(req=req)
+        data, e = await self._make_request(req=req, req_type=READ_REQUEST_TYPE)
         if e is not None:
             bot_logger.error("Error fetching sheet properties: %s", e)
             return None, e
@@ -270,13 +289,15 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         if use_schema is None:
             use_schema = False
 
-        data_req = self.sheet_service.spreadsheets.values.get(
+        req = self.sheet_service.spreadsheets.values.get(
             spreadsheetId=sheet_id,
             range=f"{tab_name}!A:ZZ",
             majorDimension='ROWS'
         )
         bot_logger.debug("Prepared sheet reading request")
-        sheet_data, e = await self._make_request(req=data_req)
+        sheet_data, e = await self._make_request(
+            req=req, req_type=READ_REQUEST_TYPE
+        )
         if e is not None:
             bot_logger.error("Err reading sheet: %s", e)
             return None, e
@@ -311,7 +332,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             spreadsheetId=sheet_id,
             range=sheet_range
         )
-        resp, e = await self._make_request(req=req)
+        resp, e = await self._make_request(req=req, req_type=WRITE_REQUEST_TYPE)
         if e is not None:
             bot_logger.error("Err cleaning data: %s", e)
             return None, e
@@ -346,7 +367,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             spreadsheetId=sheet_id,
             json=req_body
         )
-        return await self._make_request(req=req)
+        return await self._make_request(req=req, req_type=WRITE_REQUEST_TYPE)
 
     async def paste_data(self, sheet_id: str, tab_name: str,
                          start_row: int, data: pl.DataFrame,
@@ -389,7 +410,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             responseValueRenderOption="UNFORMATTED_VALUE",
             responseDateTimeRenderOption="SERIAL_NUMBER"
         )
-        return await self._make_request(req=req)
+        return await self._make_request(req=req, req_type=WRITE_REQUEST_TYPE)
     
     @staticmethod
     def _compute_number_of_rows_to_drop(current_len: int, new_len: int,
@@ -448,7 +469,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         )
         # Execute append request
         bot_logger.debug("Appending Natively")
-        return await self._make_request(req=req)
+        return await self._make_request(req=req, req_type=WRITE_REQUEST_TYPE)
     
     async def add_sheet(self, sheet_id: str, title: str, 
                         rows: Optional[int] = None,
@@ -465,7 +486,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             spreadsheetId=sheet_id,
             json=json_body
         )
-        return await self._make_request(req=req)
+        return await self._make_request(req=req, req_type=WRITE_REQUEST_TYPE)
 
 
 #TODO Oct 3 2023:

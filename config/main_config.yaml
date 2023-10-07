@@ -30,3 +30,11 @@ user_input_schemas: "config/schemas/user_inputs.yaml"
 float_precision: 4
 
 input_prompt_timeout: 30
+
+rps:
+  google_sheets:
+    read:
+      rps: 1
+    write:
+      rps: 1
+  

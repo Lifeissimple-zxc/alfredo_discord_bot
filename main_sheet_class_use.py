@@ -8,6 +8,7 @@ import yaml
 
 from alfredo_lib import MAIN_CFG
 from alfredo_lib.gateways import google_sheets_gateway
+from alfredo_lib.gateways.base import async_rps_limiter
 
 # Logging boilerplate
 # Read logging configuration
@@ -19,9 +20,18 @@ logging.config.dictConfig(LOGGING_CONFIG)
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
 
-sheets = google_sheets_gateway.GoogleSheetAsyncGateway(
-    service_acc_path="secrets/google.json"
+read_limiter = async_rps_limiter.AsyncLimiter(
+    **MAIN_CFG["rps"]["google_sheets"]["read"]
 )
+write_limiter = async_rps_limiter.AsyncLimiter(
+    **MAIN_CFG["rps"]["google_sheets"]["read"]
+)
+sheets = google_sheets_gateway.GoogleSheetAsyncGateway(
+    service_acc_path="secrets/google.json",
+    read_rps_limiter=read_limiter,
+    write_rps_limter=write_limiter
+)
+
 
 SAMPLE_SPREADSHEET_ID = "1x_8Jq6difcp606OQUJuvO8NpE5r7yl5GfJeY7boDeGo" 
 SAMPLE_TAB_READ = "test"

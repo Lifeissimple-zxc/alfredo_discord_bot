@@ -33,6 +33,7 @@ input_prompt_timeout: 30
 
 rps:
   google_sheets:
+  # keys under read and write need to match __init__ args of async_rps_limiter.AsyncLimiter class
     read:
       rps: 1
     write:

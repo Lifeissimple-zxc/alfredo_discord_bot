@@ -12,6 +12,7 @@ from aiogoogle.auth import creds
 
 from alfredo_lib import MAIN_CFG
 from alfredo_lib.gateways.base import async_rps_limiter
+from alfredo_lib.gateways.base.my_retry import simple_async_retry
 
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
@@ -490,7 +491,10 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
 
 
 #TODO Oct 3 2023:
-# Add RPS throttling!!!
 # Add an async retries for requests
+    # For this _make_request needs to be rewritten bc now the deco conflicts with the main func
+    # Create a wrapper func calling _make_request, decorate _make_request and move try except to the higher level func.
+    # Test that the thing works ok, that retries indeed happen
+    # Watch a deeper video on retries.
 # Start calling functions of this class in bot
 

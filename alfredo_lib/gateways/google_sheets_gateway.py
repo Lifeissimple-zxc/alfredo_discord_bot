@@ -469,4 +469,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
 
 
 #TODO Oct 3 2023:
+# Add RPS throttling!!!
+# Add an async retries for requests
 # Start calling functions of this class in bot
+

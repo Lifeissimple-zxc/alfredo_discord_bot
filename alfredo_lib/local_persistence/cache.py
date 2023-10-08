@@ -1,19 +1,15 @@
-import re
-import logging
-import time
 import json
+import logging
+import re
+import time
 from pathlib import Path
-from typing import Union, Optional
+from typing import Optional, Union
 
-from sqlalchemy import (
-    engine,
-    orm,
-    exc,
-    create_engine
-)
+import polars as pl
+from sqlalchemy import create_engine, engine, exc, orm
 
-from alfredo_lib.local_persistence import models
 from alfredo_lib import MAIN_CFG
+from alfredo_lib.local_persistence import models
 
 # Get loggers
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
@@ -25,6 +21,17 @@ backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
 # Update data in users table
 # Add transaction row to the table
 # Drop row in the transaction table
+
+# Constants for parsing ORM rows to PY objects
+ROW_PARSE_MODE_STRING = "str"
+ROW_PARSE_MODE_DICT = "dict"
+ROW_PARSE_MODE_DF = "df"
+OK_ROW_PARSE_MODES = {
+    ROW_PARSE_MODE_STRING,
+    ROW_PARSE_MODE_DICT,
+    ROW_PARSE_MODE_DF
+}
+
 class DbErrorHandler:
     """
     Class respponsible for parsing DB errors.
@@ -134,10 +141,18 @@ class BaseCache(DbErrorHandler):
         return int(time.time() * 1000)
     
     @staticmethod
-    def _parse_db_row(row: engine.row.Row) -> dict:
+    def parse_db_row(row: engine.row.Row, mode: Optional[str] = None) -> dict:
         """
         Parses an ORM row to a dict
         """
+        # Default mode to string
+        mode = mode or ROW_PARSE_MODE_STRING
+        if mode not in OK_ROW_PARSE_MODES:
+            e = ValueError(
+                f"Bad parse mode {mode}. Expected one of: {OK_ROW_PARSE_MODES}"
+            )
+            bot_logger.error(e)
+            raise e
         # Make several modes: dict and string TODO
         bot_logger.debug("Parsing user data to a dict")
         res = {}
@@ -147,7 +162,17 @@ class BaseCache(DbErrorHandler):
             val = getattr(row, col_name)
             if val: 
                 res[col_name] = val
-        return json.dumps(res, indent=4)
+        
+        if mode == ROW_PARSE_MODE_STRING:
+            return json.dumps(res, indent=4)
+        elif mode == ROW_PARSE_MODE_DICT:
+            return res
+        elif mode == ROW_PARSE_MODE_DF:
+            # Our dict needs a transformation to be a df
+            df_data = {key: [value] for key, value in res.items()}
+            df = pl.DataFrame(df_data)
+            return df
+        
     
     def _construct_table_row(self, dst_attr_name: str, **kwargs) -> tuple:
         """
@@ -300,7 +325,7 @@ class UserCache(BaseCache):
         
         # Getting here means we parse ORM object for some user-facing stuff
         try:
-            user_data = self._parse_db_row(user)
+            user_data = self.parse_db_row(user)
         except Exception as e:
             bot_logger.error("%s Error parsing user data: %s", e)
         bot_logger.debug("Parsed user data for %s", discord_id)
@@ -395,14 +420,11 @@ class Cache(UserCache, TransactionCache):
     def get_user_transactions(
             self,
             user: models.User,
-            parse: Optional[bool] = None
+            parse_mode: Optional[str] = None
         ) -> Union[models.Transaction, dict, None]:
         """
         ### Fetches 
         """
-        if parse is None:
-            parse = True
-
         bot_logger.debug("Reading transactions of %s", user.username)
         if not user.transactions:
             return None
@@ -411,12 +433,12 @@ class Cache(UserCache, TransactionCache):
         except Exception as e:
             bot_logger.error("Error reading transactions for %s: %s",
                              user.username, e)
-        if not parse:
+        if parse_mode is None:
             bot_logger.debug("parse=False, returning ORM transaction object")
             return tr_row
         # Separating result / no result scenarions with this if
         # if tr_row:
-        return self._parse_db_row(tr_row)
+        return self.parse_db_row(tr_row, mode=parse_mode)
 
 
         

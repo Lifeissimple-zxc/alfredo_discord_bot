@@ -3,6 +3,7 @@ Module implements transaction-realted commands for alfredo
 """
 import logging
 
+import polars as pl
 from discord.ext import commands
 
 from alfredo_lib import MAIN_CFG
@@ -70,7 +71,9 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         user, e = self.lc.get_user(discord_id=discord_id, parse=False)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
-        transaction = self.lc.get_user_transactions(user=user, parse=True)
+        transaction = self.lc.get_user_transactions(
+            user=user, parse_mode=cache.ROW_PARSE_MODE_STRING
+        )
         bot_logger.debug("Fetched user transaction")
         if transaction:
             await ctx.author.send(
@@ -113,12 +116,12 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         bot_logger.debug("Command invoked")
         discord_id = ctx.author.id
         # Check if caller discord id is in db
-        user, e = self.lcs.get_user(discord_id=discord_id, parse=False)
+        user, e = self.lc.get_user(discord_id=discord_id, parse=False)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         # Check if field is valid
         allowed_fields = self.ic.create_prompt_keys(model="transaction",
-                                                             mode="all")
+                                                    mode="all")
         if field not in allowed_fields and field is not None:
             # TODO this should be handled in a generic fashion
             await ctx.author.send(f"{field} can't be updated by users")
@@ -144,3 +147,50 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             bot_logger.error(msg)
             await ctx.author.send(msg)
         await ctx.author.send("Transaction data updated!")
+
+    @commands.command(aliases=("tts",))
+    async def transaction_to_sheet(self, ctx: commands.Context):
+        """
+        Sends cached transaction to sheet and removes if from cache on success
+        """
+        bot_logger.debug("Command invoked")
+        discord_id = ctx.author.id
+        # Check if caller discord id is in db
+        user, e = self.lc.get_user(discord_id=discord_id, parse=False)
+        if e is not None:
+            raise ex.UserNotRegisteredError(msg=str(e))
+        # Check for base fields presence TODO
+        transaction = self.lc.get_user_transactions(user=user)
+        if not transaction:
+            await ctx.author.send("No transactions located, can't send to sheet")
+            return
+        df = self.lc.parse_db_row(row=transaction, mode=cache.ROW_PARSE_MODE_DF)
+        # TODO move this schema creation & colrenaming to a separate func
+        sheet_schema = MAIN_CFG["google_sheets"]["transaction_tab"]["schema"]
+        cols_to_sheet = list(sheet_schema.keys())
+        # Take a subset
+        df = df.select(cols_to_sheet)
+        bot_logger.debug("Prepared data to send to sheet: %s", df)
+        # Rename cols
+        rename_exp = [pl.col(key).alias(value["sheet_name"])
+                      for key, value in sheet_schema.items()]
+        df = df.with_columns(rename_exp)
+        bot_logger.debug("Renamed columns for the sheet: %s", df)
+        sheet_cols = [value["sheet_name"] for value in sheet_schema.values()]
+        df = df.select(sheet_cols)
+        bot_logger.debug("DF to paste to sheet: %s", df)
+        # Append to sheet
+        _, e = await self.sheets.append_data_native(
+            sheet_id=user.spreadsheet, data=df,
+            tab_name=MAIN_CFG["google_sheets"]["transaction_tab"]["name"],
+            row_limit=MAIN_CFG["google_sheets"]["transaction_tab"]["row_limit"]
+        )
+        # Check for error
+        msg = "Data append - ok!"
+        if e is not None:
+            msg = f"Error appending data to the sheet: {e}"
+            bot_logger.error(msg)
+        await ctx.author.send(msg)
+        # TODO delete row from cache
+
+

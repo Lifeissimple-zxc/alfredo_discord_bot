@@ -65,6 +65,8 @@ google_sheets:
       split_percent:
         sheet_name: "Split"
         type: "Float64"
+    row_limit: 1000000
   hdr_index: 1
+
 
   

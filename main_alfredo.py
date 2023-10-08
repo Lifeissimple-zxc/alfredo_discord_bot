@@ -70,7 +70,8 @@ def run_alfredo():
                                    sheets=sheets))
         except Exception as e:
             bot_logger.exception("Can't load AccountCog: %s", e)
-
+        bot_logger.debug("Loaded AccountCog")
+        
         try:
             await bot.add_cog(
                 transaction.TransactionCog(bot=bot, local_cache=local_cache,
@@ -78,8 +79,9 @@ def run_alfredo():
                                            sheets=sheets))
         except Exception as e:
             bot_logger.exception("Can't load TransactionCog: %s", e)
+        bot_logger.debug("Loaded TransactionCog")
             
-        bot_logger.debug("Loaded AccountCog")
+        
     
     # This is where the bot is actually launched
     bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)

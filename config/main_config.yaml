@@ -31,11 +31,40 @@ float_precision: 4
 
 input_prompt_timeout: 30
 
-rps:
-  google_sheets:
+google_sheets:
+  version: "v4"
+  service_file: "secrets/google.json"
+  rps:
   # keys under read and write need to match __init__ args of async_rps_limiter.AsyncLimiter class
     read:
       rps: 1
     write:
       rps: 1
+  transaction_tab:
+    name: "alfredo_transactions"
+    schema:
+      # Keys need to match transaction table's columns in DB
+      created:
+        sheet_name: "Created Unix Millsec"
+        type: "Int64"
+      user_id:
+        sheet_name: "User ID"
+        type: "Int64"
+      amount:
+        sheet_name: "Amount"
+        type: "Float64"
+      currency:
+        sheet_name: "Currency"
+        type: "Utf8"
+      category:
+        sheet_name: "Category"
+        type: "Utf8"
+      comment:
+        sheet_name: "Comment"
+        type: "Utf8"
+      split_percent:
+        sheet_name: "Split"
+        type: "Float64"
+  hdr_index: 1
+
   

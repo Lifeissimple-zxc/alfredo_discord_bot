@@ -1,14 +1,16 @@
+"""
+Module implements utility functions relied on by account and transaction cogs
+"""
 import asyncio
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 import discord
+import polars as pl
 from discord.ext import commands
 
 from alfredo_lib import MAIN_CFG
-from alfredo_lib.alfredo_deps import cache, validator
-from alfredo_lib.bot import ex
-from alfredo_lib.local_persistence import models
+from alfredo_lib.alfredo_deps import cache, google_sheets_gateway, validator
 
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 
@@ -18,11 +20,15 @@ class CogHelper(commands.Cog):
     #TODO objects in this init should be singletons instead
     def __init__(self, bot: commands.Bot,
                  local_cache: cache.Cache,
-                 input_controller: validator.InputController):
+                 input_controller: validator.InputController,
+                 sheets: google_sheets_gateway.GoogleSheetAsyncGateway):
+        """
+        Instantiates the helper class
+        """
         self.bot = bot
         self.lc = local_cache
         self.ic = input_controller
-
+        self.sheets = sheets
 
     @staticmethod
     def check_ctx(msg: discord.Message, author: discord.User):
@@ -118,3 +124,54 @@ class CogHelper(commands.Cog):
            
         bot_logger.debug("Collected data for command %s: %s", command, res)
         return res
+    
+    async def _prepare_sheet(self, sheet_id: str) -> Union[None, Exception]:
+        """
+        Prepares spreadsheet where transactions will be appended
+        """
+        # Get sheet data
+        sp, e = await self.sheets.get_sheet_properties(sheet_id=sheet_id)
+        if e is not None:
+            bot_logger.error("Error fetching sheet properties: %s", e)
+        # Check if tab is there
+        sheet_data = self.sheets.parse_raw_properties(
+            sheet_properties=sp
+        )
+        tab_name = MAIN_CFG["google_sheets"]["transaction_tab"]["name"]
+        tab_schema = MAIN_CFG["google_sheets"]["transaction_tab"]["schema"]
+        hdr_index = MAIN_CFG["google_sheets"]["hdr_index"]
+        header_row = [value["sheet_name"] for value in tab_schema.values()]
+        # Adding if not present
+        if tab_name not in sheet_data.keys():
+            bot_logger.debug("%s sheet does not have %s tab",
+                             sheet_id, tab_name)
+            _, e = await self.sheets.add_sheet(sheet_id=sheet_id,
+                                               title=tab_name)
+            if e is not None:
+                return e
+            bot_logger.debug("Added %s tab", tab_name)
+            df = pl.DataFrame(data=[header_row]).transpose()
+
+            _, e = await self.sheets.paste_data(sheet_id=sheet_id,
+                                                tab_name=tab_name,
+                                                start_row=hdr_index,
+                                                data=df, include_header=False)
+            if e is not None:
+                return e
+            bot_logger.debug("Added %s row to the tab", df)
+            return
+        # Check if header matches schema
+        sheet_df, e = await self.sheets.read_sheet(sheet_id=sheet_id,
+                                                   tab_name=tab_name,
+                                                   header_rownum=hdr_index-1,
+                                                   as_df=True)
+        if e is not None:
+            return e
+        bot_logger.debug("Fetched %s data from the sheet", sheet_df)
+        sheet_header = list(sheet_df.columns)
+        bot_logger.debug("Sheet header: %s, needed row: %s",
+                         sheet_header, header_row)
+        if sorted(sheet_header) != sorted(header_row):
+            msg = f"Sheet {sheet_id} has a malformed {tab_name} tab."
+            msg = f"{msg} Paste {header_row} to the first row and try again."
+            return ValueError(msg)

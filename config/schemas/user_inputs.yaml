@@ -2,10 +2,10 @@ user:
   # Not keeping discord ID bc it is provided automatically
   base:
     username: "str"
+    spreadsheet: "str"
   extra:
     timezone: "str"
     currency: "str"
-    spreadsheet: "str"
 
 transaction:
   # currency needs to be pulled from user data

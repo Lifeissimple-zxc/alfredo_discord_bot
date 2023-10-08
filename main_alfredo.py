@@ -5,13 +5,10 @@ import discord
 import yaml
 from discord.ext import commands
 
-from alfredo_lib.alfredo_deps import (
-    local_cache,
-    input_controller
-)
+from alfredo_lib import ENV_VARS, MAIN_CFG
+from alfredo_lib.alfredo_deps import input_controller, local_cache, sheets
 from alfredo_lib.bot import ex
 from alfredo_lib.bot.cogs import account, transaction
-from alfredo_lib import MAIN_CFG, ENV_VARS
 
 # Logging boilerplate
 # Read logging configuration
@@ -31,11 +28,15 @@ def run_alfredo():
     intents = discord.Intents.default()
     intents.message_content = True
 
-    bot = commands.Bot(command_prefix=MAIN_CFG["command_prefix"], intents=intents)
+    bot = commands.Bot(command_prefix=MAIN_CFG["command_prefix"],
+                       intents=intents)
 
     @bot.event
     async def on_ready():
         bot_logger.debug("User: %s (ID: %s)", bot.user, bot.user.id)
+        await sheets.discover_sheet_service(
+            api_version=MAIN_CFG["google_sheets"]["version"]
+        )
 
     @bot.event
     async def on_command_error(ctx: commands.Context, error: Exception):
@@ -63,14 +64,18 @@ def run_alfredo():
             return
         
         try:
-            await bot.add_cog(account.AccountCog(bot=bot, local_cache=local_cache,
-                                            input_controller=input_controller))
+            await bot.add_cog(
+                account.AccountCog(bot=bot, local_cache=local_cache,
+                                   input_controller=input_controller,
+                                   sheets=sheets))
         except Exception as e:
             bot_logger.exception("Can't load AccountCog: %s", e)
 
         try:
-            await bot.add_cog(transaction.TransactionCog(bot=bot, local_cache=local_cache,
-                                              input_controller=input_controller))
+            await bot.add_cog(
+                transaction.TransactionCog(bot=bot, local_cache=local_cache,
+                                           input_controller=input_controller,
+                                           sheets=sheets))
         except Exception as e:
             bot_logger.exception("Can't load TransactionCog: %s", e)
             

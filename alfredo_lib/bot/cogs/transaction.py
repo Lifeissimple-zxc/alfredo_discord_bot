@@ -1,10 +1,12 @@
-
+"""
+Module implements transaction-realted commands for alfredo
+"""
 import logging
 
 from discord.ext import commands
 
 from alfredo_lib import MAIN_CFG
-from alfredo_lib.alfredo_deps import cache, validator
+from alfredo_lib.alfredo_deps import cache, google_sheets_gateway, validator
 from alfredo_lib.bot import ex
 from alfredo_lib.bot.cogs.base import base_cog
 from alfredo_lib.local_persistence import models
@@ -16,9 +18,11 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
 
     def __init__(self, bot: commands.Bot,
                  local_cache: cache.Cache,
-                 input_controller: validator.InputController):
+                 input_controller: validator.InputController,
+                 sheets: google_sheets_gateway.GoogleSheetAsyncGateway):
         super().__init__(bot=bot, local_cache=local_cache,
-                         input_controller=input_controller)
+                         input_controller=input_controller,
+                         sheets=sheets)
         
     @commands.command(aliases=("get_tr",))
     async def get_transaction(self, ctx: commands.Context) -> tuple:

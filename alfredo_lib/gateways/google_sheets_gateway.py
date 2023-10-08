@@ -74,7 +74,7 @@ class GoogleSheetMapper:
         return tab["sheetId"], None
     
     @staticmethod
-    def _parse_raw_properties(sheet_properties: dict):
+    def parse_raw_properties(sheet_properties: dict):
         """
         Mapper converting raw response to from Google Sheets
         to a dict of {tab_name: properties} form
@@ -322,7 +322,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             user_msg = self.error_to_user_message(e=e.og_exception)
             return None, aiogoogle.excs.HTTPError(user_msg)
     
-    async def _get_sheet_properties(self, sheet_id: str) -> tuple:
+    async def get_sheet_properties(self, sheet_id: str) -> tuple:
         """
         Fetches sheet data via a get request
         """
@@ -343,7 +343,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
                          as_df: Optional[bool] = None,
                          use_schema: Optional[bool] = None) -> tuple:
         """
-        Fetches data from spreadsheet to a python dict
+        Fetches data from spreadsheet
         """
         # Default values
         if header_rownum is None:
@@ -381,8 +381,10 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         
         # Converting to polars
         bot_logger.debug("Converting to polars")
-        df = pl.DataFrame(data=data).transpose()
-        df.columns = header
+        df = pl.DataFrame(data=data)
+        if len(df) > 0:
+            df = df.transpose()
+            df.columns = header
         if not use_schema:
             bot_logger.debug("use_schema is False, returning untyped")
             return df, None
@@ -415,8 +417,8 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         if start is None:
             start = 1
 
-        sheet_properties = await self._get_sheet_properties(sheet_id=sheet_id)
-        sheet_tabs_data = self._parse_raw_properties(
+        sheet_properties = await self.get_sheet_properties(sheet_id=sheet_id)
+        sheet_tabs_data = self.parse_raw_properties(
             sheet_properties=sheet_properties
         )
         tab_id, e = await self._tab_name_to_tab_id(

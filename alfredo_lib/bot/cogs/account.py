@@ -1,15 +1,15 @@
-import asyncio
+"""
+Module implements account-realted commands for alfredo
+"""
 import logging
 from typing import Optional
 
-import discord
 from discord.ext import commands
 
 from alfredo_lib import MAIN_CFG
-from alfredo_lib.alfredo_deps import cache, validator
+from alfredo_lib.alfredo_deps import cache, google_sheets_gateway, validator
 from alfredo_lib.bot import ex
 from alfredo_lib.bot.cogs.base import base_cog
-from alfredo_lib.local_persistence import models
 
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 
@@ -18,9 +18,14 @@ class AccountCog(base_cog.CogHelper, name="account"):
 
     def __init__(self, bot: commands.Bot,
                  local_cache: cache.Cache,
-                 input_controller: validator.InputController):
+                 input_controller: validator.InputController,
+                 sheets: google_sheets_gateway.GoogleSheetAsyncGateway):
+        """
+        Instantiates account cog
+        """
         super().__init__(bot=bot, local_cache=local_cache,
-                         input_controller=input_controller)
+                         input_controller=input_controller,
+                         sheets=sheets)
 
     @commands.command()
     async def register(self, ctx: commands.Context):
@@ -51,14 +56,37 @@ class AccountCog(base_cog.CogHelper, name="account"):
         await ctx.message.author.send(
             f"User {username} registered with discord_id {reg_data['discord_id']}"
         )
-    
+
+    @commands.command()
+    async def prepare_sheet(self, ctx: commands.Context):
+        """Prepares sheet for alfredo"""
+        discord_id = ctx.author.id
+        bot_logger.debug("User %s invoked %s command",
+                         discord_id, "prepare_sheet")
+        user_data, user_msg = self.lc.get_user(discord_id, parse=False)
+        if user_msg is not None:
+            raise ex.UserNotRegisteredError(msg=user_msg)
+        sheet_id = user_data.spreadsheet
+        bot_logger.debug("Preparing sheet %s for user %s",
+                         sheet_id, discord_id)
+        e = await self._prepare_sheet(sheet_id=sheet_id)
+        # Quick check for success to avoid indenting code
+        if e is None:
+            await ctx.message.author.send("Sheet preparation - ok!")
+            return
+        bot_logger.error("Error preparing sheet %s: %s", sheet_id, e)
+        await ctx.message.author.send(
+            f"Error when preparing sheet: {e}"
+        )
+        
     @commands.command()
     async def whoami(self, ctx: commands.Context):
+        """Shows account data if a user is registered"""
         # Read data to variables
         discord_id = ctx.author.id
         #TODO how can we have this logging call embedded into the commands?
         #TODO mb a decorator in the bot class?
-        bot_logger.debug("User %s invoked %s command", discord_id, "get_my_data")
+        bot_logger.debug("User %s invoked %s command", discord_id, "whoami")
         # Read from DB, generally we parse here
         # So the second item might not be an exception
         user_data, user_msg = self.lc.get_user(discord_id)
@@ -72,7 +100,7 @@ class AccountCog(base_cog.CogHelper, name="account"):
                                field: Optional[str] = None,
                                value: Optional[str] = None):
         """
-        ### Updates user data
+        Updates user data
         """
         command = "update_user_data" #TODO make it a config
         discord_id = ctx.author.id

@@ -25,6 +25,24 @@ SHEET_SCOPES = [
 READ_REQUEST_TYPE = "r"
 WRITE_REQUEST_TYPE = "w"
 
+class GoogleSheetRetriableError(Exception):
+    """
+    Custom exception class to differentiate cases worth triggering a retry
+    """
+    def __init__(self, msg: str, og_exception: Exception):
+        "Instantiates the exception"
+        super().__init__(msg)
+        self.og_exception = og_exception
+
+class GoogleSheetBadRequestError(Exception):
+    """
+    Custom exception class to differentiate 4XX cases
+    """
+    def __init__(self, msg: str, og_exception: Exception):
+        "Instantiates the exception"
+        super().__init__(msg)
+        self.og_exception = og_exception
+
 class GoogleSheetMapper:
     """
     Class encapsulates mappers that are used by GoogleSheetAsyncGateway
@@ -174,12 +192,29 @@ class GoogleSheetMapper:
         return req
     
     @staticmethod
-    def error_response_to_user_message(json_body: dict) -> str:
+    def _error_to_response_code(e: aiogoogle.excs.HTTPError) -> int:
+        """
+        Converts e to a response code. Needed for handling different errors.
+        """
+        code = e.res.json["error"].get("code", None)
+        if code is not None:
+            return int(code)
+        
+    @staticmethod
+    def _error_to_message(e: aiogoogle.excs.HTTPError) -> str:
+        """
+        Converts e to a response code. Needed for handling different errors.
+        """
+        msg = e.res.json["error"].get("message", None)
+        if msg is not None:
+            return str(msg)
+    
+    def error_to_user_message(self, e: aiogoogle.excs.HTTPError) -> str:
         """
         Parses response received on error to a user-friendly string
         """
-        code = json_body.get("code", None)
-        message = json_body.get("message", None)
+        code = self._error_to_response_code(e=e)
+        message = self._error_to_message(e=e)
         user_msg = "Google Sheets Error."
         if code is not None:
             user_msg = f"{user_msg} Code: {code}."
@@ -229,14 +264,43 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         )
         bot_logger.debug("Performed %s sheets service discovery", api_version)
 
-    async def _make_request(self, req: aiogoogle.models.Request,
-                            req_type: str) -> tuple:
+    
+    @simple_async_retry(exceptions=(GoogleSheetRetriableError,
+                                    aiogoogle.excs.AuthError),
+                        logger=bot_logger, retries=10, delay=1)
+    async def __make_request(self, req: aiogoogle.models.Request,
+                             timeout: int) -> aiogoogle.models.Response:
         """
-        Abstraction to simplifiy how we send requests to Gsheet backend
+        Private method simplifying sending API requests to Google Backend.
+        Encorporates some basic retry logic.
+        """
+        try:
+            res = await self.gsheet_client.as_service_account(
+                req, timeout=timeout
+            )
+            return res
+        except aiogoogle.excs.HTTPError as e:
+            if 400 <= self._error_to_response_code(e=e) < 500:
+                raise GoogleSheetBadRequestError(
+                    msg="Bad Request", og_exception=e
+                )
+            else:
+                raise GoogleSheetRetriableError(
+                    msg="Retriable error", og_exception=e
+                )
+    
+    async def _request_wrapper(
+            self, req: aiogoogle.models.Request,
+            req_type: str, timeout: Optional[int] = None
+            ) -> tuple:
+        """
+        Abstraction on top of __make_request that controls RPS limiting
+        and handles exceptions.
         """
         # TODO exceptions
         # TODO ratelimitting!!!
         # TODO errors for API requests
+        timeout = timeout or 10
         
         # Not wrapping to a separate func bc mapper has no access to limiters
         if req_type == READ_REQUEST_TYPE:
@@ -250,12 +314,12 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
 
         try:
             async with limiter:
-                resp = await self.gsheet_client.as_service_account(req)
+                resp = await self.__make_request(req=req, timeout=timeout)
                 return resp, None
-        except aiogoogle.excs.HTTPError as e:
+        except (GoogleSheetBadRequestError, GoogleSheetRetriableError) as e:
             bot_logger.debug("Request error. Request: %s. Response: %s",
-                             e.req.json, e.res.json)
-            user_msg = self.error_response_to_user_message(json_body=e.res.json)
+                             e.og_exception.req.json, e.og_exception.res.json)
+            user_msg = self.error_to_user_message(e=e.og_exception)
             return None, aiogoogle.excs.HTTPError(user_msg)
     
     async def _get_sheet_properties(self, sheet_id: str) -> tuple:
@@ -266,7 +330,8 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         req = self.sheet_service.spreadsheets.get(spreadsheetId=sheet_id,
                                                   includeGridData=False)
         bot_logger.debug("Prepared request")
-        data, e = await self._make_request(req=req, req_type=READ_REQUEST_TYPE)
+        data, e = await self._request_wrapper(req=req,
+                                              req_type=READ_REQUEST_TYPE)
         if e is not None:
             bot_logger.error("Error fetching sheet properties: %s", e)
             return None, e
@@ -296,7 +361,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             majorDimension='ROWS'
         )
         bot_logger.debug("Prepared sheet reading request")
-        sheet_data, e = await self._make_request(
+        sheet_data, e = await self._request_wrapper(
             req=req, req_type=READ_REQUEST_TYPE
         )
         if e is not None:
@@ -333,7 +398,8 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             spreadsheetId=sheet_id,
             range=sheet_range
         )
-        resp, e = await self._make_request(req=req, req_type=WRITE_REQUEST_TYPE)
+        resp, e = await self._request_wrapper(req=req,
+                                              req_type=WRITE_REQUEST_TYPE)
         if e is not None:
             bot_logger.error("Err cleaning data: %s", e)
             return None, e
@@ -368,7 +434,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             spreadsheetId=sheet_id,
             json=req_body
         )
-        return await self._make_request(req=req, req_type=WRITE_REQUEST_TYPE)
+        return await self._request_wrapper(req=req, req_type=WRITE_REQUEST_TYPE)
 
     async def paste_data(self, sheet_id: str, tab_name: str,
                          start_row: int, data: pl.DataFrame,
@@ -411,7 +477,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             responseValueRenderOption="UNFORMATTED_VALUE",
             responseDateTimeRenderOption="SERIAL_NUMBER"
         )
-        return await self._make_request(req=req, req_type=WRITE_REQUEST_TYPE)
+        return await self._request_wrapper(req=req, req_type=WRITE_REQUEST_TYPE)
     
     @staticmethod
     def _compute_number_of_rows_to_drop(current_len: int, new_len: int,
@@ -470,7 +536,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         )
         # Execute append request
         bot_logger.debug("Appending Natively")
-        return await self._make_request(req=req, req_type=WRITE_REQUEST_TYPE)
+        return await self._request_wrapper(req=req, req_type=WRITE_REQUEST_TYPE)
     
     async def add_sheet(self, sheet_id: str, title: str, 
                         rows: Optional[int] = None,
@@ -487,14 +553,9 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             spreadsheetId=sheet_id,
             json=json_body
         )
-        return await self._make_request(req=req, req_type=WRITE_REQUEST_TYPE)
+        return await self._request_wrapper(req=req, req_type=WRITE_REQUEST_TYPE)
 
 
 #TODO Oct 3 2023:
-# Add an async retries for requests
-    # For this _make_request needs to be rewritten bc now the deco conflicts with the main func
-    # Create a wrapper func calling _make_request, decorate _make_request and move try except to the higher level func.
-    # Test that the thing works ok, that retries indeed happen
-    # Watch a deeper video on retries.
 # Start calling functions of this class in bot
 

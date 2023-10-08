@@ -9,7 +9,8 @@ from alfredo_lib.alfredo_deps import (
     local_cache,
     input_controller
 )
-from alfredo_lib.bot import ex, cogs
+from alfredo_lib.bot import ex
+from alfredo_lib.bot.cogs import account, transaction
 from alfredo_lib import MAIN_CFG, ENV_VARS
 
 # Logging boilerplate
@@ -62,13 +63,13 @@ def run_alfredo():
             return
         
         try:
-            await bot.add_cog(cogs.AccountCog(bot=bot, local_cache=local_cache,
+            await bot.add_cog(account.AccountCog(bot=bot, local_cache=local_cache,
                                             input_controller=input_controller))
         except Exception as e:
             bot_logger.exception("Can't load AccountCog: %s", e)
 
         try:
-            await bot.add_cog(cogs.TransactionCog(bot=bot, local_cache=local_cache,
+            await bot.add_cog(transaction.TransactionCog(bot=bot, local_cache=local_cache,
                                               input_controller=input_controller))
         except Exception as e:
             bot_logger.exception("Can't load TransactionCog: %s", e)

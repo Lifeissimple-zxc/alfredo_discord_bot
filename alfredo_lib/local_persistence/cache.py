@@ -408,6 +408,12 @@ class TransactionCache(BaseCache):
                              transaction.transaction_id, e)
             self.sesh.rollback()
             return e
+        
+
+class CategoryCache(BaseCache):
+    """
+    Encompasses operations on category data
+    """
 
 class Cache(UserCache, TransactionCache):
     """

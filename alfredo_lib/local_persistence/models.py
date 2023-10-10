@@ -13,7 +13,7 @@ Base = declarative_base()
 
 class User(Base):
     """
-    ### Class models user data powering alferdo
+    ### Models user data powering alferdo
     """
     __tablename__ = "users"
 
@@ -31,7 +31,7 @@ class User(Base):
 
 class Transaction(Base):
     """
-    ### Class models transaction rows
+    ### Models transaction rows
     """
     __tablename__ = "transaction_cache"
 
@@ -48,7 +48,9 @@ class Transaction(Base):
     # Ideally, I should not be storing text, but model currencies as a separate table :)
     # For comment text is the only option
     currency = Column(String(3), nullable=False)
-    category = Column(String(30), nullable=False)
+    category_id = Column(Integer,
+                         ForeignKey("categories.category_id"),
+                         nullable=False)
     comment = Column(String(100))
     split_percent = Column(Float(precision=FLOAT_PRECISION))
     # This field needs to update every time users update a transaction
@@ -57,7 +59,7 @@ class Transaction(Base):
 
 class LogRecordRow(Base):
     """
-    ### Class models logrecords
+    ### Models logrecords
     """
     # Dst table for all log records
     __tablename__ = "logs"
@@ -68,3 +70,21 @@ class LogRecordRow(Base):
     message = Column(String(300), nullable=False)
     level = Column(String(30), nullable=False)
     func_name = Column(String(30), nullable=False)
+
+
+class TransactionCategoryRow(Base):
+    """
+    ### Models transaction categories
+    """
+    __tablename__ = "categories"
+    category_id = Column(Integer, primary_key=True)
+    created = Column(Integer, nullable=False)
+    category_name = Column(String(100), nullable=False)
+    # user_id as FK
+    user_id = Column(
+        Integer,
+        ForeignKey("users.user_id",ondelete="CASCADE"),
+        nullable=False
+    )
+    # This automates categories as an attribute of transaction
+    transactions = relationship("Transaction", backref="category")

@@ -89,7 +89,9 @@ class AccountCog(base_cog.CogHelper, name="account"):
         bot_logger.debug("User %s invoked %s command", discord_id, "whoami")
         # Read from DB, generally we parse here
         # So the second item might not be an exception
-        user_data, user_msg = self.lc.get_user(discord_id=discord_id)
+        user_data, user_msg = self.lc.get_user(
+            discord_id=discord_id, parse_mode=cache.ROW_PARSE_MODE_STRING
+        )
         if user_msg is not None:
             raise ex.UserNotRegisteredError(msg=user_msg)
         await ctx.message.author.send(f"Your data:\n{user_data}")

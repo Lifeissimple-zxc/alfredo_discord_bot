@@ -114,7 +114,8 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         await ctx.author.send("Transaction deletion - success!")
 
     @commands.command(aliases=("upd_tr",))
-    async def update_transaction(self, ctx: commands.Context, field: str, data: str):
+    async def update_transaction(self, ctx: commands.Context,
+                                 field: str, data: str):
         """
         Updates transaction using user input
         """
@@ -191,11 +192,16 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             row_limit=MAIN_CFG["google_sheets"]["transaction_tab"]["row_limit"]
         )
         # Check for error
-        msg = "Data append - ok!"
         if e is not None:
-            msg = f"Error appending data to the sheet: {e}"
+            msg = f"Error appending to the sheet. Please retry the command: {e}"
             bot_logger.error(msg)
-        await ctx.author.send(msg)
-        # TODO delete row from cache
+            return
+        e = self.lc.delete_row(transaction)
+        if e is not None:
+            msg = f"Error deleting transaction row: {e}"
+            bot_logger.error(msg)
+            await ctx.author.send(msg)
+            return
+        await ctx.author.send("Transaction pasted to the sheet!")
 
 

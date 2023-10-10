@@ -63,7 +63,7 @@ class AccountCog(base_cog.CogHelper, name="account"):
         discord_id = ctx.author.id
         bot_logger.debug("User %s invoked %s command",
                          discord_id, "prepare_sheet")
-        user_data, user_msg = self.lc.get_user(discord_id, parse=False)
+        user_data, user_msg = self.lc.get_user(discord_id=discord_id)
         if user_msg is not None:
             raise ex.UserNotRegisteredError(msg=user_msg)
         sheet_id = user_data.spreadsheet
@@ -89,7 +89,7 @@ class AccountCog(base_cog.CogHelper, name="account"):
         bot_logger.debug("User %s invoked %s command", discord_id, "whoami")
         # Read from DB, generally we parse here
         # So the second item might not be an exception
-        user_data, user_msg = self.lc.get_user(discord_id)
+        user_data, user_msg = self.lc.get_user(discord_id=discord_id)
         if user_msg is not None:
             raise ex.UserNotRegisteredError(msg=user_msg)
         await ctx.message.author.send(f"Your data:\n{user_data}")
@@ -109,7 +109,7 @@ class AccountCog(base_cog.CogHelper, name="account"):
         # TODO this function is too long
         # TODO can we re-use the user object returned from local_cache.get_user?
         # Check for user's eligiblity to edit this
-        _, e = self.lc.get_user(discord_id=discord_id, parse=False)
+        _, e = self.lc.get_user(discord_id=discord_id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         # Check if users are expected to update this field  
@@ -143,7 +143,8 @@ class AccountCog(base_cog.CogHelper, name="account"):
                 return
         # Attempt an update
         bot_logger.debug("Attempting update on user %s db data", discord_id)
-        e = self.lc.update_user_data(discord_id=discord_id, user_update=user_update)
+        e = self.lc.update_user_data(discord_id=discord_id,
+                                     user_update=user_update)
         # Log on results
         if e is not None:
             bot_logger.error("Update for user %s failed, %s", discord_id, e)

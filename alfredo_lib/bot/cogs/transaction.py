@@ -21,6 +21,9 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
                  local_cache: cache.Cache,
                  input_controller: validator.InputController,
                  sheets: google_sheets_gateway.GoogleSheetAsyncGateway):
+        """
+        Instantiates the class
+        """
         super().__init__(bot=bot, local_cache=local_cache,
                          input_controller=input_controller,
                          sheets=sheets)
@@ -33,10 +36,12 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         bot_logger.debug("Command invoked")
         discord_id = ctx.author.id
         # Check if caller discord id is in db
-        user, e = self.lc.get_user(discord_id=discord_id, parse=False)
+        user, e = self.lc.get_user(discord_id=discord_id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
-        transaction = self.lc.get_user_transactions(user=user, parse=True) 
+        transaction = self.lc.get_user_transactions(
+            user=user, parse_mode=cache.ROW_PARSE_MODE_STRING
+        ) 
         if transaction:
             await ctx.author.send(
                 MAIN_CFG["messages"]["ong_transaction_exists"].format(transaction=transaction)
@@ -68,7 +73,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         discord_id = ctx.author.id
         command = "new_transaction"
         # Check if caller discord id is in db
-        user, e = self.lc.get_user(discord_id=discord_id, parse=False)
+        user, e = self.lc.get_user(discord_id=discord_id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         transaction = self.lc.get_user_transactions(
@@ -91,11 +96,11 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         bot_logger.debug("Command invoked")
         discord_id = ctx.author.id
         # Check if caller discord id is in db
-        user, e = self.lc.get_user(discord_id=discord_id, parse=False)
+        user, e = self.lc.get_user(discord_id=discord_id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         # Get transaction as ORM obj
-        transaction = self.lc.get_user_transactions(user=user, parse=False)
+        transaction = self.lc.get_user_transactions(user=user)
         if not transaction:
             await ctx.author.send("No transactions located, can't delete")
             return
@@ -116,7 +121,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         bot_logger.debug("Command invoked")
         discord_id = ctx.author.id
         # Check if caller discord id is in db
-        user, e = self.lc.get_user(discord_id=discord_id, parse=False)
+        user, e = self.lc.get_user(discord_id=discord_id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         # Check if field is valid
@@ -134,7 +139,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             await ctx.author.send(f"{data} is not valid for {field}: {e}")
             return
         # Fetch transation that to apply updates to
-        transaction = self.lc.get_user_transactions(user=user, parse=False)
+        transaction = self.lc.get_user_transactions(user=user)
         if not transaction:
             # TODO Generic handling?
             await ctx.author.send("No transactions located, can't update")
@@ -156,7 +161,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         bot_logger.debug("Command invoked")
         discord_id = ctx.author.id
         # Check if caller discord id is in db
-        user, e = self.lc.get_user(discord_id=discord_id, parse=False)
+        user, e = self.lc.get_user(discord_id=discord_id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         # Check for base fields presence TODO

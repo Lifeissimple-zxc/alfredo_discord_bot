@@ -302,14 +302,13 @@ class UserCache(BaseCache):
             return None, ValueError("User not registered")
         return user, None  
     
-    def get_user(self, discord_id: int, parse: Optional[bool] = None) -> tuple:
+    def get_user(self, discord_id: int,
+                 parse_mode: Optional[str] = None) -> tuple:
         """
-        ### Gets user data as dict
+        Fetches user data
         """
-        if parse is None:
-            parse = True
-
         bot_logger.debug("Fetching user data for %s", discord_id)
+
         user, e = self._fetch_user_data(discord_id=discord_id)
         # Check for error
         if e is not None:
@@ -319,13 +318,13 @@ class UserCache(BaseCache):
         # Parse user data to dict
         bot_logger.debug("Got user data for %s", discord_id)
         # Quick return when parsing is not needed
-        if not parse:
-            bot_logger.debug("parse=False, returing ORM object")
+        if parse_mode is None:
+            bot_logger.debug("parse_mode not provided, returing ORM object")
             return user, None
         
         # Getting here means we parse ORM object for some user-facing stuff
         try:
-            user_data = self.parse_db_row(user)
+            user_data = self.parse_db_row(user, mode=parse_mode)
         except Exception as e:
             bot_logger.error("%s Error parsing user data: %s", e)
         bot_logger.debug("Parsed user data for %s", discord_id)
@@ -351,16 +350,18 @@ class UserCache(BaseCache):
 
 class TransactionCache(BaseCache):
     """
-    ### Class encapsulates all cache operations on transaction data
-    It inherits from users because transactions data need User attributes
+    Class encapsulates all cache operations on transaction data.
     """
     def __init__(self, db_path: str):
+        """
+        Instantiates the class
+        """
         super().__init__(db_path=db_path)
         self.transactions_table = models.Transaction
 
     def create_transaction(self, tr_data: dict) -> tuple:
         """
-        ### Creates a new transaction entry in the local db
+        Creates a new transaction entry in the local db
         :param username: username for registration
         :param discord_id: discord_id of a user
         :return: tuple(user message, error if any)
@@ -410,20 +411,22 @@ class TransactionCache(BaseCache):
 
 class Cache(UserCache, TransactionCache):
     """
-    #### Class unites all cache operations and is meant to be used in other modules
+    Class unites all cache operations and is meant to be used in other modules
     """ 
     def __init__(self, db_path: str):
+        """
+        Instantiates the class
+        """
         super().__init__(db_path)
         # Actually create schema in the db, only calling in this class
         self._create_db_tables()
 
     def get_user_transactions(
-            self,
-            user: models.User,
+            self, user: models.User,
             parse_mode: Optional[str] = None
         ) -> Union[models.Transaction, dict, None]:
         """
-        ### Fetches 
+        Fetches transaction of the current user. 
         """
         bot_logger.debug("Reading transactions of %s", user.username)
         if not user.transactions:
@@ -434,7 +437,9 @@ class Cache(UserCache, TransactionCache):
             bot_logger.error("Error reading transactions for %s: %s",
                              user.username, e)
         if parse_mode is None:
-            bot_logger.debug("parse=False, returning ORM transaction object")
+            bot_logger.debug(
+                "parse_mode not provided, returning ORM transaction object"
+            )
             return tr_row
         # Separating result / no result scenarions with this if
         # if tr_row:

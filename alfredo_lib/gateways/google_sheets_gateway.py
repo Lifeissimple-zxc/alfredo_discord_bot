@@ -522,7 +522,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             _, _ = await self.delete_rows(sheet_id=sheet_id,
                                           tab_name=tab_name,
                                           end=to_delete+1)
-        paste_pos = current_len - to_delete + 2
+        paste_pos = current_len - to_delete 
         # Prepare append request
         data_update = self._df_to_sheet_update(
             data=data, include_header=include_header

@@ -8,7 +8,7 @@ from discord.ext import commands
 from alfredo_lib import ADMINS, ENV_VARS, MAIN_CFG
 from alfredo_lib.alfredo_deps import input_controller, local_cache, sheets
 from alfredo_lib.bot import ex
-from alfredo_lib.bot.cogs import account, transaction
+from alfredo_lib.bot.cogs import account, category, transaction
 from alfredo_lib.bot.cogs.base import helpers
 
 # Logging boilerplate
@@ -79,6 +79,15 @@ def run_alfredo():
         except Exception as e:
             bot_logger.exception("Can't load TransactionCog: %s", e)
         bot_logger.debug("Loaded TransactionCog")
+
+        try:
+            await bot.add_cog(
+                category.CategoryCog(bot=bot, local_cache=local_cache,
+                                     input_controller=input_controller,
+                                     sheets=sheets))
+        except Exception as e:
+            bot_logger.exception("Can't load CategoryCog: %s", e)
+        bot_logger.debug("Loaded CategoryCog")
             
         
     

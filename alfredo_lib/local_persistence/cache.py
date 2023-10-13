@@ -6,7 +6,7 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 import polars as pl
 from sqlalchemy import create_engine, engine, exc, orm
@@ -129,7 +129,6 @@ class BaseCache(DbErrorHandler):
             conn.commit()
    
     def _create_db_tables(self):
-        #TODO
         """
         Creates db table with all the tables from args
         """
@@ -146,7 +145,7 @@ class BaseCache(DbErrorHandler):
     @staticmethod
     def parse_db_row(row: engine.row.Row, mode: Optional[str] = None) -> dict:
         """
-        Parses an ORM row to a dict
+        Parses an ORM row according to mode
         """
         # Default mode to string
         mode = mode or ROW_PARSE_MODE_STRING
@@ -417,8 +416,50 @@ class CategoryCache(BaseCache):
     """
     Encompasses operations on category data
     """
+    def __init__(self, db_path: str):
+        """
+        Instantiates the class
+        """
+        super().__init__(db_path=db_path)
 
-class Cache(UserCache, TransactionCache):
+    def _fetch_categories(self) -> List[models.TransactionCategoryRow]:
+        """
+        Fetches categories from the db
+        """
+        return self.sesh.query(models.TransactionCategoryRow.category_id,
+                               models.TransactionCategoryRow.category_name).all()
+    
+    def get_categories(self, parse_mode: Optional[str] = None) -> tuple:
+        """
+        Fetches categoriesfrom the db and parses to a python dict of
+                {
+                    category_id: category_name
+                }
+        form if parse_mode is provided
+        """    
+        category_rows = self._fetch_categories()
+        if len(category_rows) == 0:
+            return None, ValueError("No categories in the db")
+        if parse_mode is None:
+            bot_logger.debug("parse_mode not provided, returing ORM object")
+            return category_rows, None
+        try:
+            res = {row.category_id: row.category_name for row in category_rows}
+            if parse_mode == ROW_PARSE_MODE_DICT:
+                return res, None
+            elif parse_mode == ROW_PARSE_MODE_STRING:
+                return json.dumps(res, indent=4), None
+            else:
+                raise Exception(
+                    f"Bad parse mode {parse_mode}. Expected: {ROW_PARSE_MODE_DICT} or {ROW_PARSE_MODE_STRING}"  # noqa: E501
+                )
+        except Exception as e:
+            bot_logger.warning("Error parsing catetory rows to dict")
+            return None, e
+
+        
+
+class Cache(UserCache, TransactionCache, CategoryCache):
     """
     Class unites all cache operations and is meant to be used in other modules
     """ 

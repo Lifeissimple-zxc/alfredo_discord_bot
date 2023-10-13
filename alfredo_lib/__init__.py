@@ -1,22 +1,20 @@
-
+import dotenv
 import yaml
-from pathlib import Path
-from dotenv import dotenv_values
 
-ENV_VARS = dotenv_values(".env")
+
+ENV_VARS = dotenv.dotenv_values(".env")
 ENV = "LOCAL" # TODO shold be coming from CLI args
 
 # Read main cfg
-with open("config/main_config.yaml") as _cfg:
-    MAIN_CFG = yaml.safe_load(_cfg)
+with open(file="config/main_config.yaml", encoding="utf-8") as _f:
+    MAIN_CFG = yaml.safe_load(_f)
 
-# Read error feedback messages to a separate variable
 ERROR_MESSAGES = MAIN_CFG["error_messages"]
 
-# Paths for reading commands
-BASE_DIR = Path(__file__).parent.parent # Two levels up
-CMDS_DIR = BASE_DIR / "cmd_test"
-COGS_DIR = BASE_DIR / "cogs"
+with open(file=MAIN_CFG["user_input_schemas"], encoding="utf-8") as _f:
+    USER_INPUT_SCHEMAS = yaml.safe_load(_f)
 
-with open(MAIN_CFG["user_input_schemas"]) as _schema_file:
-    USER_INPUT_SCHEMAS = yaml.safe_load(_schema_file)
+with open(file=MAIN_CFG["secrets"], encoding="utf-8") as _f:
+    SECRETS = yaml.safe_load(_f)
+# Making it a set for faster lookups
+ADMINS = set(SECRETS["admin_discord_ids"])

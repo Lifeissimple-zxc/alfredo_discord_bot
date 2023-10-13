@@ -5,10 +5,11 @@ import discord
 import yaml
 from discord.ext import commands
 
-from alfredo_lib import ENV_VARS, MAIN_CFG
+from alfredo_lib import ADMINS, ENV_VARS, MAIN_CFG
 from alfredo_lib.alfredo_deps import input_controller, local_cache, sheets
 from alfredo_lib.bot import ex
 from alfredo_lib.bot.cogs import account, transaction
+from alfredo_lib.bot.cogs.base import helpers
 
 # Logging boilerplate
 # Read logging configuration
@@ -52,17 +53,15 @@ def run_alfredo():
                     MAIN_CFG["error_messages"]["user_not_registered"].format(cmd=ctx.invoked_with)
                 )
     
+    
     @bot.command()
+    @helpers.admin_command(admin_ids=ADMINS, logger=bot_logger,
+                           command_name="load_cogs")
     async def load_cogs(ctx: commands.Context):
         """
         Secret command to loading cogs
         """ 
-        # TODO add admin check here, should come from config
         # TODO make the command hidden
-        if ctx.author.id not in {194543162604126208}:
-            bot_logger.warning("User %s tried to load cogs", ctx.author.id)
-            return
-        
         try:
             await bot.add_cog(
                 account.AccountCog(bot=bot, local_cache=local_cache,

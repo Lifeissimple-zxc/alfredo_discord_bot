@@ -68,5 +68,6 @@ google_sheets:
     row_limit: 1000000
   hdr_index: 1
 
+secrets: secrets/secrets.yaml
 
   

@@ -1,5 +1,5 @@
 """
-Module implements a simple retry
+Module implements a simple async-friendly retry decorator
 """
 import asyncio
 import functools

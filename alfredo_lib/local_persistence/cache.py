@@ -1,3 +1,6 @@
+"""
+Module implements classes for interacting with a local DB using ORM
+"""
 import json
 import logging
 import re

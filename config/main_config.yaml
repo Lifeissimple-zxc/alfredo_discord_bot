@@ -9,6 +9,7 @@ error_messages:
   missing_input: "Missing mandatory arguments. Check !help and try again"
   prompt_timeout: "Took too long to response. Stopping input collection."
   user_not_registered: "User not registered. Can't execute {cmd}."
+  admin_permission_needed: "{cmd} needs admin access. Can't execute!"
 
 messages:
   ong_transaction_exists: "Found an ongoing transaction. Data:\n {transaction}"

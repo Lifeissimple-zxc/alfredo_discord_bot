@@ -15,6 +15,13 @@ class ContextMissingError(Exception):
     pass
 
 
+class AdminPermissionNeededError(Exception):
+    """
+    Custom exception for scenarios where non-admin calls and admin command
+    """
+    pass
+
+
 def _args_contain_ctx(args: Sequence):
     """
     Locates context in args if there is one, otherwise returns a None
@@ -23,8 +30,7 @@ def _args_contain_ctx(args: Sequence):
         if isinstance(a, commands.Context):
             return a
 
-def admin_command(admin_ids: set, logger: logging.Logger,
-                  command_name: str):
+def admin_command(admin_ids: set, logger: logging.Logger):
     """
     Restricts command uses to admin_ids by raising exc_to_trigger
     """
@@ -38,11 +44,10 @@ def admin_command(admin_ids: set, logger: logging.Logger,
                 raise e
             logger.debug("Found context in args")
             if ctx.author.id not in admin_ids:
-                logger.warning("User %s tried calling %s w/o admin rights",
-                               ctx.author.id, command_name)
-                raise Exception("Test ERror to see that the decorator works")
-            logger.debug("Checked author for being an admin, running %s",
-                         command_name)
+                raise AdminPermissionNeededError(
+                    "Commands requires admin access"
+                )
+            logger.debug("Checked author for being an admin")
             return await func(*args, **kwargs)
         return wrapper
     return decorator   

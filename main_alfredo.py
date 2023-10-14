@@ -45,18 +45,22 @@ def run_alfredo():
             await ctx.message.author.send(MAIN_CFG["error_messages"]["missing_input"])
         # All the raises inside the bot's body are wrapped with CommandInvokeError
         elif isinstance(error, commands.CommandInvokeError):
-            cause = error.__cause__
-            if isinstance(cause, ex.UserNotRegisteredError):
-                bot_logger.info("Unregistered %s tried to invoke %s",
+            if isinstance(error.__cause__, ex.UserNotRegisteredError):
+                bot_logger.debug("Unregistered %s attempted invoking %s",
                                 ctx.message.author.id, ctx.invoked_with)
                 await ctx.message.author.send(
                     MAIN_CFG["error_messages"]["user_not_registered"].format(cmd=ctx.invoked_with)
                 )
+            elif isinstance(error.__cause__, helpers.AdminPermissionNeededError):
+                bot_logger.debug("Non admin %s attempted invoking %s",
+                                 ctx.message.author.id, ctx.invoked_with)
+                await ctx.message.author.send(
+                    MAIN_CFG["error_messages"]["admin_permission_needed"].format(cmd=ctx.invoked_with)
+                )
     
     
     @bot.command()
-    @helpers.admin_command(admin_ids=ADMINS, logger=bot_logger,
-                           command_name="load_cogs")
+    @helpers.admin_command(admin_ids=ADMINS, logger=bot_logger)
     async def load_cogs(ctx: commands.Context):
         """
         Secret command to loading cogs

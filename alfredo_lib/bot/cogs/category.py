@@ -48,8 +48,7 @@ class CategoryCog(base_cog.CogHelper, name="category"):
             bot_logger.error("Error getting categories: %s", e)
 
     @commands.command(aliases=("new_cat",))
-    @helpers.admin_command(admin_ids=ADMINS, logger=bot_logger,
-                           command_name="create_category")
+    @helpers.admin_command(admin_ids=ADMINS, logger=bot_logger)
     async def create_category(self, ctx: commands.Context) -> tuple:
         """
         Creates a new category for transactions. Admin only.

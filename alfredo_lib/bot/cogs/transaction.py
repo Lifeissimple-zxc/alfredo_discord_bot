@@ -91,7 +91,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
     @commands.command(aliases=("del_tr",))
     async def delete_ong_transaction(self, ctx: commands.Context):
         """
-        ### Deletes ongoing transaction 
+        Deletes ongoing (not yet sent to sheets) transaction 
         """
         bot_logger.debug("Command invoked")
         discord_id = ctx.author.id

@@ -423,6 +423,15 @@ class CategoryCache(BaseCache):
         super().__init__(db_path=db_path)
         self.categories_table = models.TransactionCategoryRow
 
+    def _fetch_category(self, category_id: int) -> models.TransactionCategoryRow:
+        """
+        Fetches category row by category_id
+        """
+        return self.sesh.query(
+            models.TransactionCategoryRow).filter(
+                models.TransactionCategoryRow.category_id==category_id
+            ).first()
+    
     def _fetch_categories(self) -> List[models.TransactionCategoryRow]:
         """
         Fetches categories from the db

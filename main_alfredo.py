@@ -42,7 +42,16 @@ def run_alfredo():
     @bot.event
     async def on_command_error(ctx: commands.Context, error: Exception):
         if isinstance(error, commands.MissingRequiredArgument):
-            await ctx.message.author.send(MAIN_CFG["error_messages"]["missing_input"])
+            await ctx.message.author.send(
+                MAIN_CFG["error_messages"]["missing_input"]
+            )
+        elif isinstance(error, commands.BadArgument):
+            arg = error.args[0] if error.args else 'Unknown input'
+            await ctx.message.author.send(
+                MAIN_CFG["error_messages"]["bad_argument"].format(
+                    arg=arg, cmd=ctx.invoked_with
+                )
+            )
         # All the raises inside the bot's body are wrapped with CommandInvokeError
         elif isinstance(error, commands.CommandInvokeError):
             if isinstance(error.__cause__, ex.UserNotRegisteredError):
@@ -51,11 +60,21 @@ def run_alfredo():
                 await ctx.message.author.send(
                     MAIN_CFG["error_messages"]["user_not_registered"].format(cmd=ctx.invoked_with)
                 )
-            elif isinstance(error.__cause__, helpers.AdminPermissionNeededError):
+            elif isinstance(error.__cause__, ex.AdminPermissionNeededError):
                 bot_logger.debug("Non admin %s attempted invoking %s",
                                  ctx.message.author.id, ctx.invoked_with)
                 await ctx.message.author.send(
                     MAIN_CFG["error_messages"]["admin_permission_needed"].format(cmd=ctx.invoked_with)
+                )
+            elif isinstance(error.__cause__, ex.WrongUpdateFieldInputError):  # noqa: E501
+                bot_logger.debug(
+                    "%s attempted and incorrect field attempt for %s: %s",
+                    ctx.message.author.id, ctx.invoked_with, error.__cause__
+                )
+                await ctx.message.author.send(
+                    MAIN_CFG["error_messages"]["bad_field_update"].format(
+                        cmd=ctx.invoked_with, e=error.__cause__
+                    )
                 )
     
     

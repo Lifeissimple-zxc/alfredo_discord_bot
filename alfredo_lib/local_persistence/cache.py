@@ -393,7 +393,7 @@ class TransactionCache(BaseCache):
         return "Error saving transaction", res
 
     def update_transaction(self, update: dict,
-                           transaction: models.Transaction) -> tuple:
+                           transaction: models.Transaction) -> Union[Exception, None]:  # noqa: E501
         """
         Updates transaction
         """
@@ -481,7 +481,25 @@ class CategoryCache(BaseCache):
             bot_logger.debug(user_msg)
             return user_msg, None
         return "Error adding category", res
-
+    
+    def update_category(self, category_id: int, update: dict) -> tuple:
+        """
+        Updates category data
+        """
+        category_to_update = self.sesh.query(
+            models.TransactionCategoryRow).filter(
+            models.TransactionCategoryRow.category_id==category_id
+        )
+        category_to_update.update(values=update)
+        try: 
+            self.sesh.commit()
+            bot_logger.debug("Update query succeeded for category %s",
+                             category_id)
+        except Exception as e:
+            bot_logger.error("Update query failed for category %s: %s",
+                             category_id)
+            self.sesh.rollback()
+            return e
         
 
 class Cache(UserCache, TransactionCache, CategoryCache):

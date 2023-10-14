@@ -10,6 +10,8 @@ error_messages:
   prompt_timeout: "Took too long to response. Stopping input collection."
   user_not_registered: "User not registered. Can't execute {cmd}."
   admin_permission_needed: "{cmd} needs admin access. Can't execute!"
+  bad_field_update: "{cmd} failed due to bad field update: {e}"
+  bad_argument: "Invalid input for command {cmd}: {arg}"
 
 messages:
   ong_transaction_exists: "Found an ongoing transaction. Data:\n {transaction}"

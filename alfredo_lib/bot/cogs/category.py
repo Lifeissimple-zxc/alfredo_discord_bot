@@ -14,6 +14,7 @@ from alfredo_lib.local_persistence import models
 
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 
+
 class CategoryCog(base_cog.CogHelper, name="category"):
     """Encapsulates commands related to categories"""
 
@@ -53,6 +54,7 @@ class CategoryCog(base_cog.CogHelper, name="category"):
         """
         Creates a new category for transactions. Admin only.
         """
+        bot_logger.debug("Command invoked")
         category_data = await self.get_input(
             ctx=ctx, command="create_category",
             model="category", rec_discord_id=False,
@@ -63,4 +65,31 @@ class CategoryCog(base_cog.CogHelper, name="category"):
         if e is not None:
             bot_logger.error("create_category() failed: %s", e)
         await ctx.author.send(msg)
+
+    @commands.command(aliases=("upd_cat",))
+    @helpers.admin_command(admin_ids=ADMINS, logger=bot_logger)
+    async def update_category(self, ctx: commands.Context, category_id: int,
+                              field: str, data: str) -> tuple:
+        """
+        Updates category data
+        """
+        try:
+            bot_logger.debug("Command invoked")
+            allowed_fields = self.ic.create_prompt_keys(model="category",
+                                                        mode="all")
+            if field not in allowed_fields and field is not None:
+                raise ex.WrongUpdateFieldInputError(
+                    f"{field} can't be updated by users"
+                )
+            #TODO not doing data validation till we pass MVP stage of the project
+            update = {field: data}
+            e = self.lc.update_category(category_id=category_id, update=update)
+            if e is not None:
+                msg = f"DB Data update failed for category: {e}"
+                bot_logger.error(msg)
+                await ctx.author.send(msg)
+            await ctx.author.send("Category data updated!")
+        except Exception as e:
+            bot_logger.error(f"Error updating category: {e}")
+
         

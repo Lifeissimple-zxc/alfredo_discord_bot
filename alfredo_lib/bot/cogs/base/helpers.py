@@ -7,19 +7,7 @@ from typing import Callable, Sequence
 
 from discord.ext import commands
 
-
-class ContextMissingError(Exception):
-    """
-    Custom exception for scenarios where ctx is not in kwargs
-    """
-    pass
-
-
-class AdminPermissionNeededError(Exception):
-    """
-    Custom exception for scenarios where non-admin calls and admin command
-    """
-    pass
+from alfredo_lib.bot import ex
 
 
 def _args_contain_ctx(args: Sequence):
@@ -39,13 +27,13 @@ def admin_command(admin_ids: set, logger: logging.Logger):
         async def wrapper(*args, **kwargs):
             # get admin from ctx arg (ctx.author.id)
             if (ctx := _args_contain_ctx(args)) is None:
-                e = ContextMissingError("ctx arg not found")
+                e = ex.ContextMissingError("ctx arg not found")
                 logger.error(e)
                 raise e
             logger.debug("Found context in args")
             if ctx.author.id not in admin_ids:
-                raise AdminPermissionNeededError(
-                    "Commands requires admin access"
+                raise ex.AdminPermissionNeededError(
+                    "Command requires admin access"
                 )
             logger.debug("Checked author for being an admin")
             return await func(*args, **kwargs)

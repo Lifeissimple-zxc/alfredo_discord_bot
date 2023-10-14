@@ -130,11 +130,12 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
                                                     mode="all")
         if field not in allowed_fields and field is not None:
             # TODO this should be handled in a generic fashion
-            await ctx.author.send(f"{field} can't be updated by users")
-            return 
+            raise ex.WrongUpdateFieldInputError(
+                f"{field} can't be updated by users"
+            )
         # Perform type conversion if needed
         data, e = self.ic.parse_input(model="transaction",
-                                               field=field, data=data)
+                                      field=field, data=data)
         if e is not None:
             # TODO this should be handled in a generic fashion too
             await ctx.author.send(f"{data} is not valid for {field}: {e}")

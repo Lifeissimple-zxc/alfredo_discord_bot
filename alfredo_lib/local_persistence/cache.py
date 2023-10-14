@@ -421,6 +421,7 @@ class CategoryCache(BaseCache):
         Instantiates the class
         """
         super().__init__(db_path=db_path)
+        self.categories_table = models.TransactionCategoryRow
 
     def _fetch_categories(self) -> List[models.TransactionCategoryRow]:
         """
@@ -456,6 +457,30 @@ class CategoryCache(BaseCache):
         except Exception as e:
             bot_logger.warning("Error parsing catetory rows to dict")
             return None, e
+    
+    def create_category(self, category_data: dict) -> tuple:
+        """
+        Creates a new category entry in the local db
+        :param category_data: input data on the category
+        :return: tuple(user_message, error if any)  
+        """
+        category_row, e = self._construct_table_row(
+            dst_attr_name="categories_table",
+            **category_data
+        )
+        if e is not None:
+            user_msg = f"Internal data error: {e}"
+            if isinstance(e, AttributeError):
+                user_msg = "Internal data error: categories data does not exist on server."  # noqa: E501
+            return user_msg, e
+        bot_logger.debug("Prepared data for category creation: %s",
+                         category_data)
+        res = self._add_new_row(row_struct=category_row)
+        if res is None:
+            user_msg = f"{category_data['category_name']} added"
+            bot_logger.debug(user_msg)
+            return user_msg, None
+        return "Error adding category", res
 
         
 

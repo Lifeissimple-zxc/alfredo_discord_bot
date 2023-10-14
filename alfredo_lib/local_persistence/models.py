@@ -80,11 +80,4 @@ class TransactionCategoryRow(Base):
     category_id = Column(Integer, primary_key=True)
     created = Column(Integer, nullable=False)
     category_name = Column(String(100), nullable=False)
-    # user_id as FK
-    user_id = Column(
-        Integer,
-        ForeignKey("users.user_id",ondelete="CASCADE"),
-        nullable=False
-    )
-    # This automates categories as an attribute of transaction
     transactions = relationship("Transaction", backref="category")

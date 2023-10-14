@@ -15,3 +15,7 @@ transaction:
   extra:
     split_percent: "float"
     comment: "str"
+
+category:
+  base:
+    category_name: "str"

@@ -11,7 +11,7 @@ transaction:
   # currency needs to be pulled from user data
   base:
     amount: "float"
-    category: "str"
+    category_id: "int"
   extra:
     split_percent: "float"
     comment: "str"

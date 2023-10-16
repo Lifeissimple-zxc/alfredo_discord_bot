@@ -1,6 +1,7 @@
 """
 Module implements transaction-realted commands for alfredo
 """
+import json
 import logging
 
 import polars as pl
@@ -54,9 +55,29 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         """
         ### Creates a new transaction from scratch my prompting user for data
         """
-        tr_data = await self.get_input(ctx=ctx, command=command, model="transaction",
-                                       rec_discord_id=False, include_extra=True)
-        # DO we check user input somehow here??? TODO
+        categories, e = self.lc.get_categories(
+            parse_mode=cache.ROW_PARSE_MODE_DICT
+        )
+        if e is not None:
+            await ctx.author.send(
+                f"Can't create transaction. No categories data in db: {e}"
+            )
+            return
+        
+        await ctx.author.send(
+            f"Categories available: {json.dumps(obj=categories, indent=4)}"
+        )
+        tr_data = await self.get_input(
+            ctx=ctx, command=command, model="transaction",
+            rec_discord_id=False, include_extra=True
+        )
+        
+        # User can give a valid int for category 
+        print("Dict keys", type(list(categories.keys())[0]))
+        if (cat_id := tr_data["category_id"]) not in categories.keys():
+            await ctx.author.send(f"Category id {cat_id} is invalid")
+            return
+        # Add extra metadata
         tr_data["user_id"] = user.user_id
         tr_data["currency"] = user.currency
         bot_logger.debug("Transaction data prepared %s", tr_data)

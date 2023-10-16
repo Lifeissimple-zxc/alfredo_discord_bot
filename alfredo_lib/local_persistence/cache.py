@@ -93,7 +93,7 @@ class BaseCache(DbErrorHandler):
         Instantiates the class, creates the db & tables if they do not exist
         """
         self.db_path_raw = db_path
-        self.logs_table = models.LogRecordRow
+        self.logs_table = models.LogRecord
         self.engine = self._create_engine(db_path)
         # TODO Check if the below two lines can be merged?
         Session = orm.sessionmaker(bind=self.engine)
@@ -421,23 +421,23 @@ class CategoryCache(BaseCache):
         Instantiates the class
         """
         super().__init__(db_path=db_path)
-        self.categories_table = models.TransactionCategoryRow
+        self.categories_table = models.Category
 
-    def _fetch_category(self, category_id: int) -> models.TransactionCategoryRow:
+    def _fetch_category(self, category_id: int) -> models.Category:
         """
         Fetches category row by category_id
         """
         return self.sesh.query(
-            models.TransactionCategoryRow).filter(
-                models.TransactionCategoryRow.category_id==category_id
+            models.Category).filter(
+                models.Category.category_id==category_id
             ).first()
     
-    def _fetch_categories(self) -> List[models.TransactionCategoryRow]:
+    def _fetch_categories(self) -> List[models.Category]:
         """
         Fetches categories from the db
         """
-        return self.sesh.query(models.TransactionCategoryRow.category_id,
-                               models.TransactionCategoryRow.category_name).all()
+        return self.sesh.query(models.Category.category_id,
+                               models.Category.category_name).all()
     
     def get_categories(self, parse_mode: Optional[str] = None) -> tuple:
         """
@@ -496,8 +496,8 @@ class CategoryCache(BaseCache):
         Updates category data
         """
         category_to_update = self.sesh.query(
-            models.TransactionCategoryRow).filter(
-            models.TransactionCategoryRow.category_id==category_id
+            models.Category).filter(
+            models.Category.category_id==category_id
         )
         category_to_update.update(values=update)
         try: 
@@ -531,10 +531,20 @@ class Cache(UserCache, TransactionCache, CategoryCache):
         Fetches transaction of the current user. 
         """
         bot_logger.debug("Reading transactions of %s", user.username)
+        # This needs to work!
         if not user.transactions:
             return None
+        # Then refactor this!
         try:
-            tr_row = user.transactions[0]
+            tr_row = self.sesh.query(
+                models.Transaction.created,
+                models.User.username,
+                models.Transaction.amount,
+                models.Transaction.currency,
+                models.Category.category_name,
+                models.Transaction.comment,
+                models.Transaction.split_percent,
+            ).filter(models.Transaction.user_id==user.user_id).first()
         except Exception as e:
             bot_logger.error("Error reading transactions for %s: %s",
                              user.username, e)
@@ -543,8 +553,6 @@ class Cache(UserCache, TransactionCache, CategoryCache):
                 "parse_mode not provided, returning ORM transaction object"
             )
             return tr_row
-        # Separating result / no result scenarions with this if
-        # if tr_row:
         return self.parse_db_row(tr_row, mode=parse_mode)
 
 

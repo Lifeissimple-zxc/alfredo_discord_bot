@@ -25,22 +25,20 @@ class User(Base):
     created = Column(Integer, nullable=False)
     currency = Column(String(10))
     spreadsheet = Column(String(50))
-    # This automates fetching transactions
-    transactions = relationship("Transaction", backref="users")
 
 
 class Transaction(Base):
     """
     ### Models transaction rows
     """
-    __tablename__ = "transaction_cache"
+    __tablename__ = "transaction"
 
     transaction_id = Column(Integer, primary_key=True)
     created = Column(Integer, nullable=False)
     # user_id as FK
     user_id = Column(
         Integer,
-        ForeignKey("users.user_id",ondelete="CASCADE"),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=False
     )
     amount = Column(Float(precision=FLOAT_PRECISION), nullable=False)
@@ -55,9 +53,13 @@ class Transaction(Base):
     split_percent = Column(Float(precision=FLOAT_PRECISION))
     # This field needs to update every time users update a transaction
     updated_at = Column(Integer, nullable=False)
+    
+    # Relationships
+    user = relationship("User", backref="transaction")
+    category = relationship("Category", backref="transaction")
 
 
-class LogRecordRow(Base):
+class LogRecord(Base):
     """
     ### Models logrecords
     """
@@ -72,7 +74,7 @@ class LogRecordRow(Base):
     func_name = Column(String(30), nullable=False)
 
 
-class TransactionCategoryRow(Base):
+class Category(Base):
     """
     ### Models transaction categories
     """
@@ -80,4 +82,3 @@ class TransactionCategoryRow(Base):
     category_id = Column(Integer, primary_key=True)
     created = Column(Integer, nullable=False)
     category_name = Column(String(100), nullable=False)
-    transactions = relationship("Transaction", backref="category")

@@ -222,7 +222,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             msg = f"Error appending to the sheet. Please retry the command: {e}"
             bot_logger.error(msg)
             return
-        e = self.lc.delete_row(transaction)
+        e = self.lc.delete_row(user.transactions[0])
         if e is not None:
             msg = f"Error deleting transaction row: {e}"
             bot_logger.error(msg)

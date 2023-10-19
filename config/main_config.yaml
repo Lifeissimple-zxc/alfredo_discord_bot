@@ -50,8 +50,8 @@ google_sheets:
       created:
         sheet_name: "Created Unix Millsec"
         type: "Int64"
-      user_id:
-        sheet_name: "User ID"
+      username:
+        sheet_name: "User"
         type: "Int64"
       amount:
         sheet_name: "Amount"
@@ -59,7 +59,7 @@ google_sheets:
       currency:
         sheet_name: "Currency"
         type: "Utf8"
-      category:
+      category_name:
         sheet_name: "Category"
         type: "Utf8"
       comment:

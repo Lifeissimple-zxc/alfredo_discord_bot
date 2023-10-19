@@ -6,7 +6,7 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Optional, Union, List
+from typing import List, Optional, Union
 
 import polars as pl
 from sqlalchemy import create_engine, engine, exc, orm
@@ -143,7 +143,26 @@ class BaseCache(DbErrorHandler):
         return int(time.time() * 1000)
     
     @staticmethod
-    def parse_db_row(row: engine.row.Row, mode: Optional[str] = None) -> dict:
+    def _row_to_dict(row: engine.row.Row) -> dict:
+        """
+        Helper for parsing orm rows to dict
+        """
+        try:
+            return row._asdict()
+        except AttributeError:
+            bot_logger.debug("row does not have _asdict(), pasring manually")
+            res = {}
+            for col in row.__class__.__table__.columns:
+                col_name = col.name
+                val = getattr(row, col_name)
+                if val: 
+                    res[col_name] = val
+            return res
+        except Exception as e:
+            bot_logger.error("Unexpected error converting orm row to dict: %s", e)
+
+
+    def parse_db_row(self, row: engine.row.Row, mode: Optional[str] = None) -> dict:
         """
         Parses an ORM row according to mode
         """
@@ -157,14 +176,8 @@ class BaseCache(DbErrorHandler):
             raise e
         # Make several modes: dict and string TODO
         bot_logger.debug("Parsing user data to a dict")
-        res = {}
-        cols = row.__class__.__table__.columns
-        for col in cols:
-            col_name = col.name
-            val = getattr(row, col_name)
-            if val: 
-                res[col_name] = val
-        
+        res = self._row_to_dict(row=row)
+  
         if mode == ROW_PARSE_MODE_STRING:
             return json.dumps(res, indent=4)
         elif mode == ROW_PARSE_MODE_DICT:
@@ -536,15 +549,17 @@ class Cache(UserCache, TransactionCache, CategoryCache):
             return None
         # Then refactor this!
         try:
-            tr_row = self.sesh.query(
+            res = (self.sesh.query(
                 models.Transaction.created,
                 models.User.username,
                 models.Transaction.amount,
                 models.Transaction.currency,
                 models.Category.category_name,
                 models.Transaction.comment,
-                models.Transaction.split_percent,
-            ).filter(models.Transaction.user_id==user.user_id).first()
+                models.Transaction.split_percent
+            ).join(models.User).join(models.Category)
+            .filter(models.Transaction.user_id==user.user_id)
+            .first())
         except Exception as e:
             bot_logger.error("Error reading transactions for %s: %s",
                              user.username, e)
@@ -552,8 +567,10 @@ class Cache(UserCache, TransactionCache, CategoryCache):
             bot_logger.debug(
                 "parse_mode not provided, returning ORM transaction object"
             )
-            return tr_row
-        return self.parse_db_row(tr_row, mode=parse_mode)
+            return res
+        bot_logger.debug("Parsing data parse mode: %s", parse_mode)
+        return self.parse_db_row(row=res, mode=parse_mode)
+
 
 
         

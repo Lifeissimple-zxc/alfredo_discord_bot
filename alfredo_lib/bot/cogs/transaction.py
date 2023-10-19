@@ -40,9 +40,13 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         user, e = self.lc.get_user(discord_id=discord_id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
-        transaction = self.lc.get_user_transactions(
-            user=user, parse_mode=cache.ROW_PARSE_MODE_STRING
-        ) 
+        try:
+            transaction = self.lc.get_user_transactions(
+                user=user, parse_mode=cache.ROW_PARSE_MODE_STRING
+            )
+        except Exception as e:
+            bot_logger.error("Error getting transactions: %s", e)
+            raise e
         if transaction:
             await ctx.author.send(
                 MAIN_CFG["messages"]["ong_transaction_exists"].format(transaction=transaction)

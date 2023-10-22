@@ -6,6 +6,7 @@ import logging
 
 import polars as pl
 from discord.ext import commands
+from sqlalchemy import engine
 
 from alfredo_lib import MAIN_CFG
 from alfredo_lib.alfredo_deps import cache, google_sheets_gateway, validator
@@ -176,53 +177,66 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             await ctx.author.send(msg)
         await ctx.author.send("Transaction data updated!")
 
+    def _ts_row_to_sheet_df(self, transaction: engine.row.Row,
+                            sheet_schema: dict) -> pl.DataFrame:
+        """
+        Converts transaction row from db to a df that can be pasted to sheet.
+        """
+        bot_logger.debug("Starting data preparation for pasting to sheets")
+        df = self.lc.parse_db_row(row=transaction, mode=cache.ROW_PARSE_MODE_DF)
+        rename_exp = [pl.col(key).alias(value["sheet_name"])
+                      for key, value in sheet_schema.items()]
+        df = df.with_columns(rename_exp)
+        bot_logger.debug("Renamed columns for the sheet: %s", df)
+        df = df.select(
+            [value["sheet_name"] for value in sheet_schema.values()]
+        )
+        bot_logger.debug("DF to paste to sheet: %s", df)
+        return df
+    
     @commands.command(aliases=("tts",))
     async def transaction_to_sheet(self, ctx: commands.Context):
         """
         Sends cached transaction to sheet and removes if from cache on success
         """
         bot_logger.debug("Command invoked")
-        # Check if caller discord id is in db
         user, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
-        # Check for base fields presence TODO
         transaction = self.lc.get_user_transactions(user=user)
         if not transaction:
             await ctx.author.send("No transactions located, can't send to sheet")
             return
-        df = self.lc.parse_db_row(row=transaction, mode=cache.ROW_PARSE_MODE_DF)
-        # TODO move this schema creation & colrenaming to a separate func
-        sheet_schema = MAIN_CFG["google_sheets"]["transaction_tab"]["schema"]
-        cols_to_sheet = list(sheet_schema.keys())
-        # Take a subset
-        df = df.select(cols_to_sheet)
-        bot_logger.debug("Prepared data to send to sheet: %s", df)
-        # Rename cols
-        rename_exp = [pl.col(key).alias(value["sheet_name"])
-                      for key, value in sheet_schema.items()]
-        df = df.with_columns(rename_exp)
-        bot_logger.debug("Renamed columns for the sheet: %s", df)
-        sheet_cols = [value["sheet_name"] for value in sheet_schema.values()]
-        df = df.select(sheet_cols)
+        
+        try:
+            df = self._ts_row_to_sheet_df(
+                transaction=transaction,
+                sheet_schema=MAIN_CFG["google_sheets"]["transaction_tab"]["schema"]
+            )
+        except Exception as e:
+            msg = f"Unexpected error when preparing a sheet update: {e}. Admin contact needed."
+            bot_logger.error(msg)
+            await ctx.author.send(msg)
+            return
+        
         bot_logger.debug("DF to paste to sheet: %s", df)
-        # Append to sheet
         _, e = await self.sheets.append_data_native(
             sheet_id=user.spreadsheet, data=df,
             tab_name=MAIN_CFG["google_sheets"]["transaction_tab"]["name"],
             row_limit=MAIN_CFG["google_sheets"]["transaction_tab"]["row_limit"]
         )
-        # Check for error
         if e is not None:
             msg = f"Error appending to the sheet. Please retry the command: {e}"
             bot_logger.error(msg)
             return
         e = self.lc.delete_row(user.transactions[0])
+        
         if e is not None:
-            msg = f"Error deleting transaction row: {e}"
+            msg = f"Error deleting transaction row: {e}. Please delete manually by calling delete command."
             bot_logger.error(msg)
             await ctx.author.send(msg)
             return
+        
         await ctx.author.send("Transaction pasted to the sheet!")
 
 

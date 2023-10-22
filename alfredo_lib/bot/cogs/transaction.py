@@ -35,9 +35,8 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         Fetches a user's ongoing transaction if there is one
         """
         bot_logger.debug("Command invoked")
-        discord_id = ctx.author.id
         # Check if caller discord id is in db
-        user, e = self.lc.get_user(discord_id=discord_id)
+        user, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         try:
@@ -95,10 +94,9 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
     async def new_transaction(self, ctx: commands.Context):
         """Adds a new transaction to the sheet saved by the user"""
         bot_logger.debug("Command invoked")
-        discord_id = ctx.author.id
         command = "new_transaction"
         # Check if caller discord id is in db
-        user, e = self.lc.get_user(discord_id=discord_id)
+        user, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         transaction = self.lc.get_user_transactions(
@@ -119,9 +117,8 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         Deletes ongoing (not yet sent to sheets) transaction 
         """
         bot_logger.debug("Command invoked")
-        discord_id = ctx.author.id
         # Check if caller discord id is in db
-        user, e = self.lc.get_user(discord_id=discord_id)
+        user, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         # Get transaction as ORM obj
@@ -145,9 +142,8 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         Updates transaction using user input
         """
         bot_logger.debug("Command invoked")
-        discord_id = ctx.author.id
         # Check if caller discord id is in db
-        user, e = self.lc.get_user(discord_id=discord_id)
+        user, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         # Check if field is valid
@@ -173,7 +169,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             return
         # Call cache method to update transation
         e = self.lc.update_transaction(update={field: data},
-                                           transaction=transaction)
+                                       transaction=transaction)
         if e is not None:
             msg = f"DB Data update failed for transaction: {e}"
             bot_logger.error(msg)
@@ -186,9 +182,8 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         Sends cached transaction to sheet and removes if from cache on success
         """
         bot_logger.debug("Command invoked")
-        discord_id = ctx.author.id
         # Check if caller discord id is in db
-        user, e = self.lc.get_user(discord_id=discord_id)
+        user, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         # Check for base fields presence TODO

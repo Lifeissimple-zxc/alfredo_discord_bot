@@ -60,15 +60,14 @@ class AccountCog(base_cog.CogHelper, name="account"):
     @commands.command()
     async def prepare_sheet(self, ctx: commands.Context):
         """Prepares sheet for alfredo"""
-        discord_id = ctx.author.id
         bot_logger.debug("User %s invoked %s command",
-                         discord_id, "prepare_sheet")
-        user_data, user_msg = self.lc.get_user(discord_id=discord_id)
+                         ctx.author.id, "prepare_sheet")
+        user_data, user_msg = self.lc.get_user(discord_id=ctx.author.id)
         if user_msg is not None:
             raise ex.UserNotRegisteredError(msg=user_msg)
         sheet_id = user_data.spreadsheet
         bot_logger.debug("Preparing sheet %s for user %s",
-                         sheet_id, discord_id)
+                         sheet_id, ctx.author.id)
         e = await self._prepare_sheet(sheet_id=sheet_id)
         # Quick check for success to avoid indenting code
         if e is None:
@@ -82,15 +81,13 @@ class AccountCog(base_cog.CogHelper, name="account"):
     @commands.command()
     async def whoami(self, ctx: commands.Context):
         """Shows account data if a user is registered"""
-        # Read data to variables
-        discord_id = ctx.author.id
         #TODO how can we have this logging call embedded into the commands?
         #TODO mb a decorator in the bot class?
-        bot_logger.debug("User %s invoked %s command", discord_id, "whoami")
+        bot_logger.debug("User %s invoked %s command", ctx.author.id)
         # Read from DB, generally we parse here
         # So the second item might not be an exception
         user_data, user_msg = self.lc.get_user(
-            discord_id=discord_id, parse_mode=cache.ROW_PARSE_MODE_STRING
+            discord_id=ctx.author.id, parse_mode=cache.ROW_PARSE_MODE_STRING
         )
         if user_msg is not None:
             raise ex.UserNotRegisteredError(msg=user_msg)
@@ -105,13 +102,12 @@ class AccountCog(base_cog.CogHelper, name="account"):
         Updates user data
         """
         command = "update_user_data" #TODO make it a config
-        discord_id = ctx.author.id
         bot_logger.debug("%s user invoked %s command with args: %s, %s",
-                         discord_id, command, field, value)
+                         ctx.author.id, command, field, value)
         # TODO this function is too long
         # TODO can we re-use the user object returned from local_cache.get_user?
         # Check for user's eligiblity to edit this
-        _, e = self.lc.get_user(discord_id=discord_id)
+        _, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
             raise ex.UserNotRegisteredError(msg=str(e))
         # Check if users are expected to update this field  
@@ -131,12 +127,12 @@ class AccountCog(base_cog.CogHelper, name="account"):
         # if check is zero, we prompt for all fields!
         if check == 0:
             bot_logger.debug("%s user did not provide any fields, prompting...",
-                             discord_id)
+                             ctx.author.id)
             # Prompt for fields to update
             user_update = await self.get_input(ctx=ctx, command=command,
                                                model="user", include_extra=True)
             bot_logger.debug("Received update input from user %s: %s",
-                             discord_id, user_update)
+                             ctx.author.id, user_update)
             # Len of 1 means we only have discord id
             if len(user_update) == 1:
                 await ctx.message.author.send(
@@ -144,13 +140,13 @@ class AccountCog(base_cog.CogHelper, name="account"):
                 )
                 return
         # Attempt an update
-        bot_logger.debug("Attempting update on user %s db data", discord_id)
-        e = self.lc.update_user_data(discord_id=discord_id,
+        bot_logger.debug("Attempting update on user %s db data", ctx.author.id)
+        e = self.lc.update_user_data(discord_id=ctx.author.id,
                                      user_update=user_update)
         # Log on results
         if e is not None:
-            bot_logger.error("Update for user %s failed, %s", discord_id, e)
+            bot_logger.error("Update for user %s failed, %s", ctx.author.id, e)
             await ctx.message.author.send("Error when updating user data: %s", e)
             return
-        bot_logger.debug("Update for user %s succeeded", discord_id)
+        bot_logger.debug("Update for user %s succeeded", ctx.author.id)
         await ctx.message.author.send("Data updated!")

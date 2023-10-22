@@ -101,9 +101,8 @@ class CogHelper(commands.Cog):
         if include_extra is None:
             include_extra = True
 
-        discord_id = ctx.author.id
         bot_logger.debug("Prompting user %s for %s command data",
-                         discord_id, command)
+                         ctx.author.id, command)
 
         res = {}
         if rec_discord_id:

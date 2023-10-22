@@ -95,13 +95,13 @@ class AccountCog(base_cog.CogHelper, name="account"):
     async def update_user_data(self,
                                ctx: commands.Context,
                                field: Optional[str] = None,
-                               value: Optional[str] = None):
+                               data: Optional[str] = None):
         """
         Updates user data
         """
         command = COMMANDS_METADATA["update_user_data"]["name"]
         bot_logger.debug("%s user invoked %s command with args: %s, %s",
-                         ctx.author.id, command, field, value)
+                         ctx.author.id, command, field, data)
         # TODO this function is too long
         # TODO can we re-use the user object returned from local_cache.get_user?
         # Check for user's eligiblity to edit this
@@ -114,13 +114,13 @@ class AccountCog(base_cog.CogHelper, name="account"):
             await ctx.author.send(f"{field} can't be updated by users")
             return
         # Also check that value is not empty
-        check = bool(field) + bool(value)
+        check = bool(field) + bool(data)
         bot_logger.debug("Update check is %i", check)
-        if check == 1 or (value is not None and len(value) == 0):
-            await ctx.author.send(f"Can't run update with {value}, try again")
+        if check == 1 or (data is not None and len(data) == 0):
+            await ctx.author.send(f"Can't run update with {data}, try again")
             return
 
-        user_update = {field: value}
+        user_update = {field: data}
         # TODO the below IF needs to be a function?
         # if check is zero, we prompt for all fields!
         if check == 0:

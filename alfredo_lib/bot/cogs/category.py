@@ -5,7 +5,7 @@ import logging
 
 from discord.ext import commands
 
-from alfredo_lib import ADMINS, MAIN_CFG
+from alfredo_lib import ADMINS, COMMANDS_METADATA, MAIN_CFG
 from alfredo_lib.alfredo_deps import cache, google_sheets_gateway, validator
 from alfredo_lib.bot import ex
 from alfredo_lib.bot.cogs.base import base_cog, helpers
@@ -27,7 +27,7 @@ class CategoryCog(base_cog.CogHelper, name="category"):
                          input_controller=input_controller,
                          sheets=sheets)
 
-    @commands.command(alises=("get_cts",))
+    @commands.command(**COMMANDS_METADATA["get_categories"])
     async def get_categories(self, ctx: commands.Context) -> tuple:
         """
         Fetches available categories to show to the user
@@ -44,7 +44,7 @@ class CategoryCog(base_cog.CogHelper, name="category"):
         await ctx.author.send(f"Categories available:\n{categories}")
         
 
-    @commands.command(aliases=("new_cat",))
+    @commands.command(**COMMANDS_METADATA["create_category"])
     @helpers.admin_command(admin_ids=ADMINS, logger=bot_logger)
     async def create_category(self, ctx: commands.Context) -> tuple:
         """
@@ -52,7 +52,7 @@ class CategoryCog(base_cog.CogHelper, name="category"):
         """
         bot_logger.debug("Command invoked")
         category_data = await self.get_input(
-            ctx=ctx, command="create_category",
+            ctx=ctx, command=COMMANDS_METADATA["create_category"]["name"],
             model="category", rec_discord_id=False,
             include_extra=False
         )
@@ -62,7 +62,7 @@ class CategoryCog(base_cog.CogHelper, name="category"):
             bot_logger.error("create_category() failed: %s", e)
         await ctx.author.send(msg)
 
-    @commands.command(aliases=("upd_cat",))
+    @commands.command(**COMMANDS_METADATA["update_category"])
     @helpers.admin_command(admin_ids=ADMINS, logger=bot_logger)
     async def update_category(self, ctx: commands.Context, category_id: int,
                               field: str, data: str) -> tuple:
@@ -85,7 +85,7 @@ class CategoryCog(base_cog.CogHelper, name="category"):
             await ctx.author.send(msg)
         await ctx.author.send("Category data updated!")
         
-    @commands.command(aliases=("del_cat",))
+    @commands.command(**COMMANDS_METADATA["delete_category"])
     @helpers.admin_command(admin_ids=ADMINS, logger=bot_logger)
     async def delete_category(self, ctx: commands.Context, category_id: int):
         """
@@ -105,8 +105,3 @@ class CategoryCog(base_cog.CogHelper, name="category"):
             await ctx.author.send(msg)
             return
         await ctx.author.send("Category deletion - success!")
-
-        
-
-
-        

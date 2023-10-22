@@ -23,7 +23,36 @@ update_user_data:
     - "uud"
     - "update"
   help: "Updates user account data. Can update either a specific field if called with 2 arguments:
-        !uud field value where field is property to update and value is the value to set.
+        !uud field data where field is property to update and data is the value to set.
         When called without arguments, iteratively asks data for all the account's fields. Non-deterministic."
 
+get_categories:
+  name: "get_categories"
+  aliases:
+    - "gc"
+    - "get_cat"
+  help: "Shows categories available for categorizing transactions."
+
+create_category:
+  name: "create_category"
+  aliases:
+    - "nc"
+    - "new_cat"
+  help: "Creates a new category for categorizing transactions. Admin only command."
+
+update_category:
+  name: "update_category"
+  aliases:
+    - "uc"
+    - "upd_cat"
+  help: "Updates data of an already exising category. Needs 2 arguments field and data:
+        field is property to update and data is the value to set. Cannot be called without arguments.
+        Admin only command."
+
+delete_category:
+  name: "delete_category"
+  aliases:
+    - "dc"
+    - "del_cat"
+  help: "Deletes category with the given id. Admin only command. Use get_categories to fetch category ids."
 

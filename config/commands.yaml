@@ -56,3 +56,55 @@ delete_category:
     - "del_cat"
   help: "Deletes category with the given id. Admin only command. Use get_categories to fetch category ids."
 
+get_transaction:
+  name: "get_transactioin"
+  aliases:
+    - "gt"
+    - "get_tr"
+  help: "Fetches a user's ongoing transaction if there is one. Only for registered users."
+
+new_transaction:
+  name: "new_transaction"
+  aliases:
+    - "tr"
+    - "new_tr"
+  help: "Creates a new transaction row in alfredo's backend db"
+
+delete_transaction:
+  name: "delete_transaction"
+  aliases:
+    - "dt"
+    - "del_tr"
+  help: "Deletes ongoing (not yet sent to sheets) transaction"
+
+update_transaction:
+  name: "update_transaction"
+  aliases:
+    - "ut"
+    - "upd_tr"
+  help: "Updates data of an already exising transaction. Needs 2 arguments field and data:
+        field is property to update and data is the value to set. Cannot be called without arguments."
+
+transaction_to_sheet:
+  name: "transaction_to_sheet"
+  aliases:
+    - "tts"
+    - "tosheet"
+  help: "Sends cached transaction to sheet and removes if from db on success"
+
+show_guide:
+  name: "show_guide"
+  aliases:
+    - "sd"
+    - "guide"
+  help: "Shows a TLDR of how the bot is meant to be used."
+  message:
+    - "This is an overview of how alfredo works and how to use it."
+    - "Alfredo is a bot helping with personal finances' management.
+      It takes in data from commands and sends it to the spreadsheet.
+      Spreadsheet id to use is provided by users on registration."
+    - "\nA typical workflow could be described as:"
+    - "\tComplete user registration (!register)."
+    - "\tShare spreadsheet with 'cr-bot228@cryptobot228.iam.gserviceaccount.com' so that alfredo could read / write data there."
+    - "\tCreate a transaction (!tr)."
+    - "\tSend transaction to  (!tts)."

@@ -8,7 +8,7 @@ import polars as pl
 from discord.ext import commands
 from sqlalchemy import engine
 
-from alfredo_lib import MAIN_CFG
+from alfredo_lib import COMMANDS_METADATA, MAIN_CFG
 from alfredo_lib.alfredo_deps import cache, google_sheets_gateway, validator
 from alfredo_lib.bot import ex
 from alfredo_lib.bot.cogs.base import base_cog
@@ -30,7 +30,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
                          input_controller=input_controller,
                          sheets=sheets)
         
-    @commands.command(aliases=("get_tr",))
+    @commands.command(**COMMANDS_METADATA["get_transaction"])
     async def get_transaction(self, ctx: commands.Context) -> tuple:
         """
         Fetches a user's ongoing transaction if there is one
@@ -75,9 +75,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             ctx=ctx, command=command, model="transaction",
             rec_discord_id=False, include_extra=True
         )
-        
-        # User can give a valid int for category 
-        print("Dict keys", type(list(categories.keys())[0]))
+
         if (cat_id := tr_data["category_id"]) not in categories.keys():
             await ctx.author.send(f"Category id {cat_id} is invalid")
             return
@@ -91,9 +89,9 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             bot_logger.error("new_transaction() failed: %s", e)
         await ctx.author.send(msg)
 
-    @commands.command(aliases=("tr",))
+    @commands.command(**COMMANDS_METADATA["new_transaction"])
     async def new_transaction(self, ctx: commands.Context):
-        """Adds a new transaction to the sheet saved by the user"""
+        """Creates a new transaction row in alfredo's backend db"""
         bot_logger.debug("Command invoked")
         command = "new_transaction"
         # Check if caller discord id is in db
@@ -112,8 +110,8 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             return
         await self._create_transaction(ctx, user=user, command=command)
     
-    @commands.command(aliases=("del_tr",))
-    async def delete_ong_transaction(self, ctx: commands.Context):
+    @commands.command(**COMMANDS_METADATA["delete_transaction"])
+    async def delete_transaction(self, ctx: commands.Context):
         """
         Deletes ongoing (not yet sent to sheets) transaction 
         """
@@ -136,7 +134,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             return
         await ctx.author.send("Transaction deletion - success!")
 
-    @commands.command(aliases=("upd_tr",))
+    @commands.command(**COMMANDS_METADATA["update_transaction"])
     async def update_transaction(self, ctx: commands.Context,
                                  field: str, data: str):
         """
@@ -194,10 +192,10 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         bot_logger.debug("DF to paste to sheet: %s", df)
         return df
     
-    @commands.command(aliases=("tts",))
+    @commands.command(**COMMANDS_METADATA["transaction_to_sheet"])
     async def transaction_to_sheet(self, ctx: commands.Context):
         """
-        Sends cached transaction to sheet and removes if from cache on success
+        Sends cached transaction to sheet and removes if from db on success
         """
         bot_logger.debug("Command invoked")
         user, e = self.lc.get_user(discord_id=ctx.author.id)

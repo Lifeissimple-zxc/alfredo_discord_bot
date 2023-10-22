@@ -1,3 +1,6 @@
+"""
+Module implements entry point to launching alfredo bot
+"""
 import logging
 import logging.config as log_config
 
@@ -5,11 +8,10 @@ import discord
 import yaml
 from discord.ext import commands
 
-from alfredo_lib import ADMINS, ENV_VARS, MAIN_CFG
+from alfredo_lib import COMMANDS_METADATA, ENV_VARS, MAIN_CFG
 from alfredo_lib.alfredo_deps import input_controller, local_cache, sheets
 from alfredo_lib.bot import ex
 from alfredo_lib.bot.cogs import account, category, transaction
-from alfredo_lib.bot.cogs.base import helpers
 
 # Logging boilerplate
 # Read logging configuration
@@ -38,6 +40,32 @@ def run_alfredo():
         await sheets.discover_sheet_service(
             api_version=MAIN_CFG["google_sheets"]["version"]
         )
+        try:
+            await bot.add_cog(
+                account.AccountCog(bot=bot, local_cache=local_cache,
+                                   input_controller=input_controller,
+                                   sheets=sheets))
+        except Exception as e:
+            bot_logger.exception("Can't load AccountCog: %s", e)
+        bot_logger.debug("Loaded AccountCog")
+        
+        try:
+            await bot.add_cog(
+                transaction.TransactionCog(bot=bot, local_cache=local_cache,
+                                           input_controller=input_controller,
+                                           sheets=sheets))
+        except Exception as e:
+            bot_logger.exception("Can't load TransactionCog: %s", e)
+        bot_logger.debug("Loaded TransactionCog")
+
+        try:
+            await bot.add_cog(
+                category.CategoryCog(bot=bot, local_cache=local_cache,
+                                     input_controller=input_controller,
+                                     sheets=sheets))
+        except Exception as e:
+            bot_logger.exception("Can't load CategoryCog: %s", e)
+        bot_logger.debug("Loaded CategoryCog")
 
     @bot.event
     async def on_command_error(ctx: commands.Context, error: Exception):
@@ -76,44 +104,25 @@ def run_alfredo():
                         cmd=ctx.invoked_with, e=error.__cause__
                     )
                 )
-    
-    
-    @bot.command()
-    @helpers.admin_command(admin_ids=ADMINS, logger=bot_logger)
-    async def load_cogs(ctx: commands.Context):
-        """
-        Secret command to loading cogs
-        """ 
-        # TODO make the command hidden
-        try:
-            await bot.add_cog(
-                account.AccountCog(bot=bot, local_cache=local_cache,
-                                   input_controller=input_controller,
-                                   sheets=sheets))
-        except Exception as e:
-            bot_logger.exception("Can't load AccountCog: %s", e)
-        bot_logger.debug("Loaded AccountCog")
-        
-        try:
-            await bot.add_cog(
-                transaction.TransactionCog(bot=bot, local_cache=local_cache,
-                                           input_controller=input_controller,
-                                           sheets=sheets))
-        except Exception as e:
-            bot_logger.exception("Can't load TransactionCog: %s", e)
-        bot_logger.debug("Loaded TransactionCog")
 
+    @bot.command(
+        name=COMMANDS_METADATA["show_guide"]["name"],
+        aliases=COMMANDS_METADATA["show_guide"]["aliases"],
+        help=COMMANDS_METADATA["show_guide"]["help"]
+    )
+    async def show_guide(ctx: commands.Context):
+        """
+        Shows a TLDR of how the bot is used to the user
+        """
+        bot_logger.debug("Command invoked")
         try:
-            await bot.add_cog(
-                category.CategoryCog(bot=bot, local_cache=local_cache,
-                                     input_controller=input_controller,
-                                     sheets=sheets))
+            msg = "\n".join(COMMANDS_METADATA["show_guide"]["message"])
+            await ctx.message.author.send(msg)
         except Exception as e:
-            bot_logger.exception("Can't load CategoryCog: %s", e)
-        bot_logger.debug("Loaded CategoryCog")
-            
-        
-    
+            msg = f"Unexpected error when preparing a guide message: {e}"
+            bot_logger.error(msg)
+            await ctx.message.author.send(msg)
+
     # This is where the bot is actually launched
     bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)
 

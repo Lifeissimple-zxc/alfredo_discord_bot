@@ -31,10 +31,13 @@ class AccountCog(base_cog.CogHelper, name="account"):
     async def register(self, ctx: commands.Context):
         """Performs User registration""" #TODO this is user facing, beware
         command = "register" #TODO make it a config
+        user, _ = self.lc.get_user(discord_id=ctx.author.id)
+        if user is not None:
+            await ctx.message.author.send("You are already registered")
+            return
+
         reg_data = await self.get_input(ctx=ctx, command=command,
-                                   model="user", include_extra=True)
-        
-        # Validate command and send message to the user on success?
+                                        model="user", include_extra=True)
         # TODO Exception uncaught here
         missing = self.ic.validate_keys(user_input=reg_data, model="user")
         if missing:
@@ -46,13 +49,11 @@ class AccountCog(base_cog.CogHelper, name="account"):
 
         user_msg, e = self.lc.create_user(reg_data)
         username = reg_data["username"]
-        # Check for error
         if e is not None:
             await ctx.message.author.send(
                 f"{command} failed for {username}: {user_msg}"
             )
             return
-        # Give feedback to a user
         await ctx.message.author.send(
             f"User {username} registered with discord_id {reg_data['discord_id']}"
         )
@@ -81,11 +82,7 @@ class AccountCog(base_cog.CogHelper, name="account"):
     @commands.command()
     async def whoami(self, ctx: commands.Context):
         """Shows account data if a user is registered"""
-        #TODO how can we have this logging call embedded into the commands?
-        #TODO mb a decorator in the bot class?
         bot_logger.debug("User %s invoked %s command", ctx.author.id)
-        # Read from DB, generally we parse here
-        # So the second item might not be an exception
         user_data, user_msg = self.lc.get_user(
             discord_id=ctx.author.id, parse_mode=cache.ROW_PARSE_MODE_STRING
         )

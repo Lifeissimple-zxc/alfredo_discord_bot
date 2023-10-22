@@ -1,1 +1,0 @@
-DB_PATH = "orm_db.db"

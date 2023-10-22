@@ -133,9 +133,7 @@ class CogHelper(commands.Cog):
         if e is not None:
             bot_logger.error("Error fetching sheet properties: %s", e)
         # Check if tab is there
-        sheet_data = self.sheets.parse_raw_properties(
-            sheet_properties=sp
-        )
+        sheet_data = self.sheets.parse_raw_properties(sheet_properties=sp)
         tab_name = MAIN_CFG["google_sheets"]["transaction_tab"]["name"]
         tab_schema = MAIN_CFG["google_sheets"]["transaction_tab"]["schema"]
         hdr_index = MAIN_CFG["google_sheets"]["hdr_index"]
@@ -162,7 +160,7 @@ class CogHelper(commands.Cog):
         # Check if header matches schema
         sheet_df, e = await self.sheets.read_sheet(sheet_id=sheet_id,
                                                    tab_name=tab_name,
-                                                   header_rownum=hdr_index-1,
+                                                   header_rownum=hdr_index,
                                                    as_df=True)
         if e is not None:
             return e

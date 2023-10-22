@@ -93,6 +93,8 @@ class GoogleSheetMapper:
         """
         header_index = header_rownum-1
         header_row = sheet_data[header_index]
+        bot_logger.debug("header row fetched: %s. Index used: %s",
+                         header_row, header_index)
         # Drop rows we want to skip based on params
         del sheet_data[header_index:header_index+1+header_offset]
         return header_row, sheet_data
@@ -368,8 +370,8 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             bot_logger.error("Err reading sheet: %s", e)
             return None, e
         # 2D array with rows here
-        bot_logger.debug("Received data back")
         sheet_data = sheet_data["values"]
+        bot_logger.debug("Received data back: %s", sheet_data)
 
         header, data = self._process_sheet_response(sheet_data=sheet_data,
                                                     header_rownum=header_rownum,

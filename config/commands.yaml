@@ -1,0 +1,29 @@
+register:
+  name: "register"
+  aliases:
+    - "reg"
+  help: "Performs user registration, the first command to use this bot."
+
+prepare_sheet:
+  name: "prepare_sheet"
+  aliases:
+    - "ps"
+    - "prep_sh"
+  help: "Prepares sheet for alfredo to append data to"
+
+whoami:
+  name: "whoami"
+  aliases:
+    - "who"
+  help: "Shows user account overview"
+
+update_user_data:
+  name: "update_user_data"
+  aliases:
+    - "uud"
+    - "update"
+  help: "Updates user account data. Can update either a specific field if called with 2 arguments:
+        !uud field value where field is property to update and value is the value to set.
+        When called without arguments, iteratively asks data for all the account's fields. Non-deterministic."
+
+

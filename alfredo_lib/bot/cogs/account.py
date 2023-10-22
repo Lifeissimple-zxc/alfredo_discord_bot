@@ -6,7 +6,7 @@ from typing import Optional
 
 from discord.ext import commands
 
-from alfredo_lib import MAIN_CFG
+from alfredo_lib import COMMANDS_METADATA, MAIN_CFG
 from alfredo_lib.alfredo_deps import cache, google_sheets_gateway, validator
 from alfredo_lib.bot import ex
 from alfredo_lib.bot.cogs.base import base_cog
@@ -27,10 +27,10 @@ class AccountCog(base_cog.CogHelper, name="account"):
                          input_controller=input_controller,
                          sheets=sheets)
 
-    @commands.command()
+    @commands.command(**COMMANDS_METADATA["register"])
     async def register(self, ctx: commands.Context):
         """Performs User registration""" #TODO this is user facing, beware
-        command = "register" #TODO make it a config
+        command = COMMANDS_METADATA["register"]["name"]
         user, _ = self.lc.get_user(discord_id=ctx.author.id)
         if user is not None:
             await ctx.message.author.send("You are already registered")
@@ -58,11 +58,11 @@ class AccountCog(base_cog.CogHelper, name="account"):
             f"User {username} registered with discord_id {reg_data['discord_id']}"
         )
 
-    @commands.command()
+    @commands.command(**COMMANDS_METADATA["prepare_sheet"])
     async def prepare_sheet(self, ctx: commands.Context):
         """Prepares sheet for alfredo"""
         bot_logger.debug("User %s invoked %s command",
-                         ctx.author.id, "prepare_sheet")
+                         ctx.author.id, COMMANDS_METADATA["prepare_sheet"]["name"])
         user_data, user_msg = self.lc.get_user(discord_id=ctx.author.id)
         if user_msg is not None:
             raise ex.UserNotRegisteredError(msg=user_msg)
@@ -79,10 +79,11 @@ class AccountCog(base_cog.CogHelper, name="account"):
             f"Error when preparing sheet: {e}"
         )
         
-    @commands.command()
+    @commands.command(**COMMANDS_METADATA["whoami"])
     async def whoami(self, ctx: commands.Context):
         """Shows account data if a user is registered"""
-        bot_logger.debug("User %s invoked %s command", ctx.author.id)
+        bot_logger.debug("User %s invoked %s command",
+                         ctx.author.id, COMMANDS_METADATA["whoami"]["name"])
         user_data, user_msg = self.lc.get_user(
             discord_id=ctx.author.id, parse_mode=cache.ROW_PARSE_MODE_STRING
         )
@@ -90,7 +91,7 @@ class AccountCog(base_cog.CogHelper, name="account"):
             raise ex.UserNotRegisteredError(msg=user_msg)
         await ctx.message.author.send(f"Your data:\n{user_data}")
     
-    @commands.command(aliases=("uud","update"))
+    @commands.command(**COMMANDS_METADATA["update_user_data"])
     async def update_user_data(self,
                                ctx: commands.Context,
                                field: Optional[str] = None,
@@ -98,7 +99,7 @@ class AccountCog(base_cog.CogHelper, name="account"):
         """
         Updates user data
         """
-        command = "update_user_data" #TODO make it a config
+        command = COMMANDS_METADATA["update_user_data"]["name"]
         bot_logger.debug("%s user invoked %s command with args: %s, %s",
                          ctx.author.id, command, field, value)
         # TODO this function is too long

@@ -73,4 +73,6 @@ google_sheets:
 
 secrets: secrets/secrets.yaml
 
+commands_metadata: "config/commands.yaml"
+
   

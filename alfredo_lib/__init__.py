@@ -18,3 +18,6 @@ with open(file=MAIN_CFG["secrets"], encoding="utf-8") as _f:
     SECRETS = yaml.safe_load(_f)
 # Making it a set for faster lookups
 ADMINS = set(SECRETS["admin_discord_ids"])
+
+with open(file=MAIN_CFG["commands_metadata"], encoding="utf-8") as _f:
+    COMMANDS_METADATA = yaml.safe_load(_f)

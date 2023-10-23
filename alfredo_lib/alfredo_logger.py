@@ -1,19 +1,25 @@
+"""
+Module implements custom logging classes for the project
+"""
+
 import logging
 import queue
-from retry import retry
-from typing import List, Dict
-from requests import session, RequestException
 from atexit import register
-from pathlib import Path
-
-from logging.handlers import QueueHandler, QueueListener, TimedRotatingFileHandler
-from logging.config import ConvertingList
 from logging import LogRecord
-
-from alfredo_lib.local_persistence.cache import Cache
-from alfredo_lib import (
-    ENV_VARS, ENV, MAIN_CFG
+from logging.config import ConvertingList
+from logging.handlers import (
+    QueueHandler,
+    QueueListener,
+    TimedRotatingFileHandler,
 )
+from pathlib import Path
+from typing import Dict, List
+
+from requests import RequestException, session
+from retry import retry
+
+from alfredo_lib import ENV, ENV_VARS, MAIN_CFG
+from alfredo_lib.local_persistence.cache import Cache
 
 # Constants
 LEVEL_MAP = {"CRITICAL": 50, "ERROR": 40, "WARNING": 30,

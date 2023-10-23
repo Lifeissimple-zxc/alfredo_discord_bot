@@ -12,6 +12,7 @@ from alfredo_lib import COMMANDS_METADATA, ENV_VARS, MAIN_CFG
 from alfredo_lib.alfredo_deps import input_controller, local_cache, sheets
 from alfredo_lib.bot import ex
 from alfredo_lib.bot.cogs import account, category, transaction
+from alfredo_lib.bot import buttons
 
 # Logging boilerplate
 # Read logging configuration
@@ -121,8 +122,14 @@ def run_alfredo():
         except Exception as e:
             msg = f"Unexpected error when preparing a guide message: {e}"
             bot_logger.error(msg)
-            await ctx.message.author.send(msg)
+            await ctx.message.author.send(contet=msg)
 
+    @bot.command()
+    async def start(ctx: commands.Context):
+        view = buttons.AccountView(bot=bot, ctx=ctx)
+
+        await ctx.message.author.send(view=view)
+    
     # This is where the bot is actually launched
     bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)
 

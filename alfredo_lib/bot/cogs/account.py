@@ -13,7 +13,7 @@ from alfredo_lib.bot.cogs.base import base_cog
 
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 
-class AccountCog(base_cog.CogHelper, name="account"):
+class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
     """Encapsulates commands related to user accounts"""
 
     def __init__(self, bot: commands.Bot,
@@ -27,9 +27,10 @@ class AccountCog(base_cog.CogHelper, name="account"):
                          input_controller=input_controller,
                          sheets=sheets)
 
-    @commands.command(**COMMANDS_METADATA["register"])
-    async def register(self, ctx: commands.Context):
-        """Performs User registration""" #TODO this is user facing, beware
+    async def _register(self, ctx: commands.Context):
+        """
+        Actual register implementation
+        """
         command = COMMANDS_METADATA["register"]["name"]
         user, _ = self.lc.get_user(discord_id=ctx.author.id)
         if user is not None:
@@ -57,6 +58,12 @@ class AccountCog(base_cog.CogHelper, name="account"):
         await ctx.message.author.send(
             f"User {username} registered with discord_id {reg_data['discord_id']}"
         )
+    
+    @commands.command(**COMMANDS_METADATA["register"])
+    async def register(self, ctx: commands.Context):
+        """Performs User registration"""
+        await self._register(ctx=ctx)
+        
 
     @commands.command(**COMMANDS_METADATA["prepare_sheet"])
     async def prepare_sheet(self, ctx: commands.Context):

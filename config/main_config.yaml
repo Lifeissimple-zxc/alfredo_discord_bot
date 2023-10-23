@@ -75,4 +75,7 @@ secrets: secrets/secrets.yaml
 
 commands_metadata: "config/commands.yaml"
 
-  
+cog_names:
+  account: "account"
+  transaction: "transaction"
+  category: "category"  

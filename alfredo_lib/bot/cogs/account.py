@@ -64,10 +64,10 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
         """Performs User registration"""
         await self._register(ctx=ctx)
         
-
-    @commands.command(**COMMANDS_METADATA["prepare_sheet"])
-    async def prepare_sheet(self, ctx: commands.Context):
-        """Prepares sheet for alfredo"""
+    async def _prepare_sheet(self, ctx: commands.Context):
+        """
+        Actual prepare_sheet() implementation
+        """
         bot_logger.debug("User %s invoked %s command",
                          ctx.author.id, COMMANDS_METADATA["prepare_sheet"]["name"])
         user_data, user_msg = self.lc.get_user(discord_id=ctx.author.id)
@@ -76,7 +76,7 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
         sheet_id = user_data.spreadsheet
         bot_logger.debug("Preparing sheet %s for user %s",
                          sheet_id, ctx.author.id)
-        e = await self._prepare_sheet(sheet_id=sheet_id)
+        e = await self._format_sheet(sheet_id=sheet_id)
         # Quick check for success to avoid indenting code
         if e is None:
             await ctx.message.author.send("Sheet preparation - ok!")
@@ -85,10 +85,18 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
         await ctx.message.author.send(
             f"Error when preparing sheet: {e}"
         )
-        
-    @commands.command(**COMMANDS_METADATA["whoami"])
-    async def whoami(self, ctx: commands.Context):
-        """Shows account data if a user is registered"""
+
+    @commands.command(**COMMANDS_METADATA["prepare_sheet"])
+    async def prepare_sheet(self, ctx: commands.Context):
+        """
+        Prepares sheet for alfredo
+        """
+        await self._ps(ctx=ctx)
+
+    async def _whoami(self, ctx: commands.Context):
+        """
+        Actual whoami implementation
+        """
         bot_logger.debug("User %s invoked %s command",
                          ctx.author.id, COMMANDS_METADATA["whoami"]["name"])
         user_data, user_msg = self.lc.get_user(
@@ -97,14 +105,17 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
         if user_msg is not None:
             raise ex.UserNotRegisteredError(msg=user_msg)
         await ctx.message.author.send(f"Your data:\n{user_data}")
+
+    @commands.command(**COMMANDS_METADATA["whoami"])
+    async def whoami(self, ctx: commands.Context):
+        """Shows account data if a user is registered"""
+        await self._whoami(ctx=ctx)
     
-    @commands.command(**COMMANDS_METADATA["update_user_data"])
-    async def update_user_data(self,
-                               ctx: commands.Context,
-                               field: Optional[str] = None,
-                               data: Optional[str] = None):
+    async def _update_user_data(self, ctx: commands.Context,
+                                field: Optional[str] = None,
+                                data: Optional[str] = None):
         """
-        Updates user data
+        Actual update_user_data implementation
         """
         command = COMMANDS_METADATA["update_user_data"]["name"]
         bot_logger.debug("%s user invoked %s command with args: %s, %s",
@@ -155,3 +166,14 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
             return
         bot_logger.debug("Update for user %s succeeded", ctx.author.id)
         await ctx.message.author.send("Data updated!")
+
+    
+    @commands.command(**COMMANDS_METADATA["update_user_data"])
+    async def update_user_data(self, ctx: commands.Context,
+                               field: Optional[str] = None,
+                               data: Optional[str] = None):
+        """
+        Updates user data
+        """
+        await self._update_user_data(ctx=ctx, field=field, data=data)
+        

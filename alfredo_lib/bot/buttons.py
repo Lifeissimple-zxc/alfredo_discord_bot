@@ -31,38 +31,58 @@ class BaseView(discord.ui.View):
         "Instantiates the view"
         self.bot = bot
         self.ctx = ctx
+        self.account_cog = self.bot.cogs[MAIN_CFG["cog_names"]["account"]]
         super().__init__()
+
 
 class AccountView(BaseView):
     """
     Class encompasses account menu
-    """
+    """ 
+
     @discord.ui.button(label="Register", 
                        style=discord.ButtonStyle.blurple)
-    async def account_register(self, interaction: discord.Interaction,
-                               button: discord.ui.Button):
+    async def register_btn(self, interaction: discord.Interaction,
+                           button: discord.ui.Button):
         "Calls register from the account cog of the bot"
-        await (self.bot.cogs[MAIN_CFG["cog_names"]["account"]]
-                ._register(ctx=self.ctx))
         await interaction.response.defer()
+        try:
+            await self.account_cog._register(ctx=self.ctx)
+        except Exception as e:
+            bot_logger.error("Error running button command: %s", e)
 
     @discord.ui.button(label="Show Account Data", 
                        style=discord.ButtonStyle.blurple)
-    async def account_show_data(self, interaction: discord.Interaction,
-                                button: discord.ui.Button):
-        await interaction.response.send_message("Showed Data")
-    
+    async def whoami_btn(self, interaction: discord.Interaction,
+                         button: discord.ui.Button):
+        "Calls whoami from the account cog of the bot"
+        await interaction.response.defer()
+        try:
+            await self.account_cog._whoami(ctx=self.ctx)
+        except Exception as e:
+            bot_logger.error("Error running button command: %s", e)
+
     @discord.ui.button(label="Prepare Sheet", 
                        style=discord.ButtonStyle.blurple)
-    async def account_prepare_sheet(self, interaction: discord.Interaction,
+    async def prepare_sheet_btn(self, interaction: discord.Interaction,
                                     button: discord.ui.Button):
-        await interaction.response.send_message("Prepared Sheet")
+        "Calls prepare_sheet from account cog of the bot"
+        await interaction.response.defer()
+        try:
+            await self.account_cog._prepare_sheet(ctx=self.ctx)
+        except Exception as e:
+            bot_logger.error("Error running button command: %s", e)
     
     @discord.ui.button(label="Update User Data",
                        style=discord.ButtonStyle.blurple)
-    async def account_update_data(self, interaction: discord.Interaction,
-                                  button: discord.ui.Button):
-        await interaction.response.send_message("Updated User Data")
+    async def update_user_data_btn(self, interaction: discord.Interaction,
+                                   button: discord.ui.Button):
+        "Calls update_user_data from account cog of the bot"
+        await interaction.response.defer()
+        try:
+            await self.account_cog._update_user_data(ctx=self.ctx)
+        except Exception as e:
+            bot_logger.error("Error running button command: %s", e)
 
     
 

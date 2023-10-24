@@ -124,7 +124,7 @@ class CogHelper(commands.Cog):
         bot_logger.debug("Collected data for command %s: %s", command, res)
         return res
     
-    async def _prepare_sheet(self, sheet_id: str) -> Union[None, Exception]:
+    async def _format_sheet(self, sheet_id: str) -> Union[None, Exception]:
         """
         Prepares spreadsheet where transactions will be appended
         """

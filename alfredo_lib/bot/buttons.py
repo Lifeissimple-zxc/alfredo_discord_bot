@@ -5,7 +5,7 @@ from typing import Callable
 import discord
 from discord.ext import commands
 
-from alfredo_lib import MAIN_CFG
+from alfredo_lib import COMMANDS_METADATA, MAIN_CFG
 
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 
@@ -40,7 +40,7 @@ class AccountView(BaseView):
     Class encompasses account menu
     """ 
 
-    @discord.ui.button(label="Register", 
+    @discord.ui.button(label=COMMANDS_METADATA["register"]["btn_label"], 
                        style=discord.ButtonStyle.blurple)
     async def register_btn(self, interaction: discord.Interaction,
                            button: discord.ui.Button):
@@ -51,7 +51,7 @@ class AccountView(BaseView):
         except Exception as e:
             bot_logger.error("Error running button command: %s", e)
 
-    @discord.ui.button(label="Show Account Data", 
+    @discord.ui.button(label=COMMANDS_METADATA["whoami"]["btn_label"], 
                        style=discord.ButtonStyle.blurple)
     async def whoami_btn(self, interaction: discord.Interaction,
                          button: discord.ui.Button):
@@ -62,7 +62,7 @@ class AccountView(BaseView):
         except Exception as e:
             bot_logger.error("Error running button command: %s", e)
 
-    @discord.ui.button(label="Prepare Sheet", 
+    @discord.ui.button(label=COMMANDS_METADATA["prepare_sheet"]["btn_label"], 
                        style=discord.ButtonStyle.blurple)
     async def prepare_sheet_btn(self, interaction: discord.Interaction,
                                     button: discord.ui.Button):
@@ -73,7 +73,7 @@ class AccountView(BaseView):
         except Exception as e:
             bot_logger.error("Error running button command: %s", e)
     
-    @discord.ui.button(label="Update User Data",
+    @discord.ui.button(label=COMMANDS_METADATA["update_user_data"]["btn_label"],
                        style=discord.ButtonStyle.blurple)
     async def update_user_data_btn(self, interaction: discord.Interaction,
                                    button: discord.ui.Button):

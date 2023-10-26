@@ -3,6 +3,7 @@ register:
   aliases:
     - "reg"
   help: "Performs user registration, the first command to use this bot."
+  btn_label: "Register"
 
 prepare_sheet:
   name: "prepare_sheet"
@@ -10,12 +11,14 @@ prepare_sheet:
     - "ps"
     - "prep_sh"
   help: "Prepares sheet for alfredo to append data to"
+  btn_label: "Prepare Sheet"
 
 whoami:
   name: "whoami"
   aliases:
     - "who"
   help: "Shows user account overview"
+  btn_label: "Show Account Data"
 
 update_user_data:
   name: "update_user_data"
@@ -25,6 +28,7 @@ update_user_data:
   help: "Updates user account data. Can update either a specific field if called with 2 arguments:
         !uud field data where field is property to update and data is the value to set.
         When called without arguments, iteratively asks data for all the account's fields. Non-deterministic."
+  btn_label: "Update User Data"
 
 get_categories:
   name: "get_categories"

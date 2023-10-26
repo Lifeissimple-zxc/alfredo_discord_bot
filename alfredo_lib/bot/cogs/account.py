@@ -59,7 +59,9 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
             f"User {username} registered with discord_id {reg_data['discord_id']}"
         )
     
-    @commands.command(**COMMANDS_METADATA["register"])
+    @commands.command(name=COMMANDS_METADATA["register"]["name"],
+                      aliases=COMMANDS_METADATA["register"]["aliases"],
+                      help=COMMANDS_METADATA["register"]["help"])
     async def register(self, ctx: commands.Context):
         """Performs User registration"""
         await self._register(ctx=ctx)
@@ -86,12 +88,14 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
             f"Error when preparing sheet: {e}"
         )
 
-    @commands.command(**COMMANDS_METADATA["prepare_sheet"])
+    @commands.command(name=COMMANDS_METADATA["prepare_sheet"]["name"],
+                      aliases=COMMANDS_METADATA["prepare_sheet"]["aliases"],
+                      help=COMMANDS_METADATA["prepare_sheet"]["help"])
     async def prepare_sheet(self, ctx: commands.Context):
         """
         Prepares sheet for alfredo
         """
-        await self._ps(ctx=ctx)
+        await self._prepare_sheet(ctx=ctx)
 
     async def _whoami(self, ctx: commands.Context):
         """
@@ -106,7 +110,9 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
             raise ex.UserNotRegisteredError(msg=user_msg)
         await ctx.message.author.send(f"Your data:\n{user_data}")
 
-    @commands.command(**COMMANDS_METADATA["whoami"])
+    @commands.command(name=COMMANDS_METADATA["whoami"]["name"],
+                      aliases=COMMANDS_METADATA["whoami"]["aliases"],
+                      help=COMMANDS_METADATA["whoami"]["help"])
     async def whoami(self, ctx: commands.Context):
         """Shows account data if a user is registered"""
         await self._whoami(ctx=ctx)
@@ -167,8 +173,9 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
         bot_logger.debug("Update for user %s succeeded", ctx.author.id)
         await ctx.message.author.send("Data updated!")
 
-    
-    @commands.command(**COMMANDS_METADATA["update_user_data"])
+    @commands.command(name=COMMANDS_METADATA["update_user_data"]["name"],
+                      aliases=COMMANDS_METADATA["update_user_data"]["aliases"],
+                      help=COMMANDS_METADATA["update_user_data"]["help"])
     async def update_user_data(self, ctx: commands.Context,
                                field: Optional[str] = None,
                                data: Optional[str] = None):

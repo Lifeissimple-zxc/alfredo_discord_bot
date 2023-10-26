@@ -45,7 +45,7 @@ class CogHelper(commands.Cog):
         mode: Optional[str] = None
     ) -> dict:
         """
-        ### Prompts for data either using input_schemas[model][mode] of input_controller
+        Prompts for data either using input_schemas[model][mode] of input_controller
         """
         # Quick mode check to avoid doing dowstream & save computation time
         mode = mode or "base"
@@ -77,6 +77,14 @@ class CogHelper(commands.Cog):
                         return res, None
                     else:
                         continue
+                # Special handling & parsing
+                if key == "spreadsheet":
+                    # TODO duplicate code here
+                    data, e = self.ic.sheet_input_to_sheet_id(sheet_input=data)
+                    if e is not None:
+                        await ctx.message.author.send(f"{key} cannot be parsed: {e}")
+                        return res, None
+
 
             except asyncio.TimeoutError as e:
                 await ctx.message.author.send(

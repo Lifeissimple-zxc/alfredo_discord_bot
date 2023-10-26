@@ -70,6 +70,10 @@ google_sheets:
         type: "Float64"
     row_limit: 1000000
   hdr_index: 1
+  sheet_id_parsing:
+    id_len: 44
+    url_pattern: "docs.google.com\/spreadsheets"
+    id_pattern: "spreadsheets\/d\/(.+)\/"
 
 secrets: secrets/secrets.yaml
 

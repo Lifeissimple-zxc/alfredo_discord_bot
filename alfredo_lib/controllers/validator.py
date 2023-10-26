@@ -1,8 +1,12 @@
-#TODO base and extra need to come from params!
+"""
+Module implements input prompting, parsing and validaton methods.
+"""
 import logging
+import re
 from typing import Optional
 
 from alfredo_lib import MAIN_CFG
+
 # Get loggers
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
@@ -13,6 +17,9 @@ class InputValidator:
     Validates types of data provided by user
     """
     def __init__(self, input_schemas: dict):
+        """
+        Instantiates the validator
+        """
         self.types_schema = self._parse_types_schema(input_schemas)
 
     @staticmethod
@@ -50,7 +57,32 @@ class InputValidator:
         if e is not None:
             return None, e
         return res, None
+    
+    @staticmethod
+    def sheet_input_to_sheet_id(sheet_input: str) -> None:
+        """
+        Converts spreadsheet input provided by the user
+        to a sheet id that alfredo can work with
+        """
+        parsing_setup = MAIN_CFG["google_sheets"]["sheet_id_parsing"]
+        bot_logger.debug("Pasring sheet_input %s to id", sheet_input)
+        sheet_id = sheet_input
 
+        if re.search(pattern=parsing_setup["url_pattern"],
+                     string=sheet_input):
+            bot_logger.debug("User provided a url")
+            if not (sheet_id := re.search(pattern=parsing_setup["id_pattern"],
+                                    string=sheet_input)):
+                return None, ValueError("Cannot parse url to sheet_id")
+            bot_logger.debug("Fetched id from sheet input")
+            sheet_id = sheet_id.group(1)
+        
+        if (id_len := len(sheet_id)) != parsing_setup["id_len"]:
+            msg = f"Invalid len {id_len} of sheet id in url. Value: {sheet_id}"
+            bot_logger.error(msg)
+            return None, ValueError(msg)
+        
+        return sheet_id, None
 
 class InputController(InputValidator):
     """

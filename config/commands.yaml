@@ -66,6 +66,7 @@ get_transaction:
     - "gt"
     - "get_tr"
   help: "Fetches a user's ongoing transaction if there is one. Only for registered users."
+  btn_label: "Show In Progress Transaction"
 
 new_transaction:
   name: "new_transaction"
@@ -73,6 +74,7 @@ new_transaction:
     - "tr"
     - "new_tr"
   help: "Creates a new transaction row in alfredo's backend db"
+  btn_label: "New Transaction"
 
 delete_transaction:
   name: "delete_transaction"
@@ -80,6 +82,7 @@ delete_transaction:
     - "dt"
     - "del_tr"
   help: "Deletes ongoing (not yet sent to sheets) transaction"
+  btn_label: "Delete Transaction"
 
 update_transaction:
   name: "update_transaction"
@@ -95,6 +98,7 @@ transaction_to_sheet:
     - "tts"
     - "tosheet"
   help: "Sends cached transaction to sheet and removes if from db on success"
+  btn_label: "Transaction To Sheet"
 
 show_guide:
   name: "show_guide"

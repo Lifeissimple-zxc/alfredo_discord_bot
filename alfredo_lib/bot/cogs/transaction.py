@@ -29,11 +29,10 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         super().__init__(bot=bot, local_cache=local_cache,
                          input_controller=input_controller,
                          sheets=sheets)
-        
-    @commands.command(**COMMANDS_METADATA["get_transaction"])
-    async def get_transaction(self, ctx: commands.Context) -> tuple:
+
+    async def _get_transaction(self, ctx: commands.Context):
         """
-        Fetches a user's ongoing transaction if there is one
+        Actual get_transaction implementation
         """
         bot_logger.debug("Command invoked")
         # Check if caller discord id is in db
@@ -53,6 +52,16 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             )
             return
         await ctx.author.send("No ongoing transactions located")
+
+
+    @commands.command(name=COMMANDS_METADATA["get_transaction"]["name"],
+                      aliases=COMMANDS_METADATA["get_transaction"]["aliases"],
+                      help=COMMANDS_METADATA["get_transaction"]["help"])
+    async def get_transaction(self, ctx: commands.Context) -> tuple:
+        """
+        Fetches a user's ongoing transaction if there is one
+        """
+        await self._get_transaction(ctx=ctx)
 
     async def _create_transaction(self, ctx: commands.Context,
                                   user: models.User, command: str):
@@ -89,9 +98,10 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             bot_logger.error("new_transaction() failed: %s", e)
         await ctx.author.send(msg)
 
-    @commands.command(**COMMANDS_METADATA["new_transaction"])
-    async def new_transaction(self, ctx: commands.Context):
-        """Creates a new transaction row in alfredo's backend db"""
+    async def _new_transaction(self, ctx: commands.Context):
+        """
+        Actual new_transaction implementation
+        """
         bot_logger.debug("Command invoked")
         command = "new_transaction"
         # Check if caller discord id is in db
@@ -109,11 +119,17 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             )
             return
         await self._create_transaction(ctx, user=user, command=command)
+
+    @commands.command(name=COMMANDS_METADATA["new_transaction"]["name"],
+                      aliases=COMMANDS_METADATA["new_transaction"]["aliases"],
+                      help=COMMANDS_METADATA["new_transaction"]["help"])
+    async def new_transaction(self, ctx: commands.Context):
+        """Creates a new transaction row in alfredo's backend db"""
+        await self._new_transaction(ctx=ctx)
     
-    @commands.command(**COMMANDS_METADATA["delete_transaction"])
-    async def delete_transaction(self, ctx: commands.Context):
+    async def _delete_transaction(self, ctx: commands.Context):
         """
-        Deletes ongoing (not yet sent to sheets) transaction 
+        Actual delete_transaction implementation
         """
         bot_logger.debug("Command invoked")
         # Check if caller discord id is in db
@@ -133,8 +149,19 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             await ctx.author.send(msg)
             return
         await ctx.author.send("Transaction deletion - success!")
+    
+    @commands.command(name=COMMANDS_METADATA["delete_transaction"]["name"],
+                      aliases=COMMANDS_METADATA["delete_transaction"]["aliases"],
+                      help=COMMANDS_METADATA["delete_transaction"]["help"])
+    async def delete_transaction(self, ctx: commands.Context):
+        """
+        Deletes ongoing (not yet sent to sheets) transaction 
+        """
+        await self._delete_transaction(ctx=ctx)
 
-    @commands.command(**COMMANDS_METADATA["update_transaction"])
+    @commands.command(name=COMMANDS_METADATA["update_transaction"]["name"],
+                      aliases=COMMANDS_METADATA["update_transaction"]["aliases"],
+                      help=COMMANDS_METADATA["update_transaction"]["help"])
     async def update_transaction(self, ctx: commands.Context,
                                  field: str, data: str):
         """
@@ -192,10 +219,9 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         bot_logger.debug("DF to paste to sheet: %s", df)
         return df
     
-    @commands.command(**COMMANDS_METADATA["transaction_to_sheet"])
-    async def transaction_to_sheet(self, ctx: commands.Context):
+    async def _transaction_to_sheet(self, ctx: commands.Context):
         """
-        Sends cached transaction to sheet and removes if from db on success
+        Implements transaction_to_sheet
         """
         bot_logger.debug("Command invoked")
         user, e = self.lc.get_user(discord_id=ctx.author.id)
@@ -236,5 +262,15 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             return
         
         await ctx.author.send("Transaction pasted to the sheet!")
+    
+    @commands.command(name=COMMANDS_METADATA["transaction_to_sheet"]["name"],
+                      aliases=COMMANDS_METADATA["transaction_to_sheet"]["aliases"],
+                      help=COMMANDS_METADATA["transaction_to_sheet"]["help"])
+    async def transaction_to_sheet(self, ctx: commands.Context):
+        """
+        Sends cached transaction to sheet and removes if from db on success
+        """
+        self._transaction_to_sheet(ctx=ctx)
+        
 
 

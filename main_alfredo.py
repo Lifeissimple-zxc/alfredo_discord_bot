@@ -10,9 +10,8 @@ from discord.ext import commands
 
 from alfredo_lib import COMMANDS_METADATA, ENV_VARS, MAIN_CFG
 from alfredo_lib.alfredo_deps import input_controller, local_cache, sheets
-from alfredo_lib.bot import ex
+from alfredo_lib.bot import buttons, ex
 from alfredo_lib.bot.cogs import account, category, transaction
-from alfredo_lib.bot import buttons
 
 # Logging boilerplate
 # Read logging configuration
@@ -126,10 +125,24 @@ def run_alfredo():
 
     @bot.command()
     async def start(ctx: commands.Context):
-        view = buttons.AccountView(bot=bot, ctx=ctx)
+        account = buttons.AccountView(bot=bot, ctx=ctx)
+        transaction = buttons.TransactionView(bot=bot, ctx=ctx)
+        await ctx.message.author.send("Account commands:")
+        await ctx.message.author.send(view=account)
+        try:
+            # Check if user is registered
+            _, e = bot.cogs[MAIN_CFG["cog_names"]["account"]].lc.get_user(discord_id=ctx.author.id)
+            if e is not None:
+                bot_logger.debug("Unregistered user invoked start, showing account view only")
+                return
+        except Exception as e:
+            bot_logger.error("Error checking registration command: %s", e)
+            return
+        bot_logger.debug("Registered user invoked start, showing transaction view")
+        await ctx.message.author.send("Transaction commands:")
+        await ctx.message.author.send(view=transaction)
+        
 
-        await ctx.message.author.send(view=view)
-    
     # This is where the bot is actually launched
     bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)
 

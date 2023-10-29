@@ -117,3 +117,7 @@ show_guide:
     - "\tCreate a transaction (!tr)."
     - "\tFormat your sheet for alfredo to paste transactions there (!ps)."
     - "\tSend transaction to  (!tts)."
+
+# Not actually needed here except for validations
+start:
+  name: "start"

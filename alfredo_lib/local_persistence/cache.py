@@ -26,9 +26,9 @@ backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
 # Drop row in the transaction table
 
 # Constants for parsing ORM rows to PY objects
-ROW_PARSE_MODE_STRING = "str"
-ROW_PARSE_MODE_DICT = "dict"
-ROW_PARSE_MODE_DF = "df"
+ROW_PARSE_MODE_STRING = 0
+ROW_PARSE_MODE_DICT = 1
+ROW_PARSE_MODE_DF = 2
 OK_ROW_PARSE_MODES = {
     ROW_PARSE_MODE_STRING,
     ROW_PARSE_MODE_DICT,
@@ -551,6 +551,7 @@ class Cache(UserCache, TransactionCache, CategoryCache):
         try:
             res = (self.sesh.query(
                 models.Transaction.created,
+                models.Transaction.transaction_id,
                 models.User.username,
                 models.Transaction.amount,
                 models.Transaction.currency,

@@ -139,7 +139,13 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             await ctx.author.send("No transactions located, can't delete")
             return
         # Delete transaction using cache class methods
-        e = self.lc.delete_row(transaction)
+        # TODO this is hacky, refactor
+        tr_row = (
+            self.lc.sesh.query(models.Transaction)
+            .filter(models.Transaction.transaction_id==transaction._asdict()["transaction_id"])
+            .first()
+        )
+        e = self.lc.delete_row(tr_row)
         if e is not None:
             msg = f"Error deleting transaction row: {e}"
             bot_logger.error(msg)

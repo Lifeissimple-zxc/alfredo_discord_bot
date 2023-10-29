@@ -3,9 +3,9 @@ Module implements input prompting, parsing and validaton methods.
 """
 import logging
 import re
-from typing import Optional
+from typing import Optional, Union
 
-from alfredo_lib import MAIN_CFG
+from alfredo_lib import FLOAT_PRECISION, MAIN_CFG
 
 # Get loggers
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
@@ -59,20 +59,20 @@ class InputValidator:
         return res, None
     
     @staticmethod
-    def sheet_input_to_sheet_id(sheet_input: str) -> None:
+    def sheet_input_to_sheet_id(user_input: str) -> None:
         """
         Converts spreadsheet input provided by the user
         to a sheet id that alfredo can work with
         """
         parsing_setup = MAIN_CFG["google_sheets"]["sheet_id_parsing"]
-        bot_logger.debug("Pasring sheet_input %s to id", sheet_input)
-        sheet_id = sheet_input
+        bot_logger.debug("Pasring sheet_input %s to id", user_input)
+        sheet_id = user_input
 
         if re.search(pattern=parsing_setup["url_pattern"],
-                     string=sheet_input):
+                     string=user_input):
             bot_logger.debug("User provided a url")
             if not (sheet_id := re.search(pattern=parsing_setup["id_pattern"],
-                                    string=sheet_input)):
+                                    string=user_input)):
                 return None, ValueError("Cannot parse url to sheet_id")
             bot_logger.debug("Fetched id from sheet input")
             sheet_id = sheet_id.group(1)
@@ -83,6 +83,32 @@ class InputValidator:
             return None, ValueError(msg)
         
         return sheet_id, None
+    
+    @staticmethod
+    def number_to_percent(user_input: Union[int, float],
+                          allow_negative: Optional[bool] = None) -> tuple:
+        """
+        Converts user given input to a percentage
+        """
+        if allow_negative is None:
+            allow_negative = False
+        
+        num_val = round(user_input, FLOAT_PRECISION) 
+        if allow_negative and num_val < 0:
+            return None, ValueError("Negative values are not allowed")
+
+        if 0 < num_val <= 1:
+            bot_logger.debug("Provided value is a percentage, returning")
+            return num_val, None
+        
+        bot_logger.debug("Provided value is not a percentage, converting")
+        num_val = round(num_val / 100, FLOAT_PRECISION)
+        if num_val > 1:
+            bot_logger.debug("Conversion did not help :(")
+            return None, ValueError("Value is too high after conversion")
+        
+        return num_val, None 
+
 
 class InputController(InputValidator):
     """

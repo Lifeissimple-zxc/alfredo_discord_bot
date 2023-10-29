@@ -4,9 +4,7 @@ Module implements orm classes powering alfredo's db
 from sqlalchemy import Column, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import declarative_base, relationship
 
-from alfredo_lib import MAIN_CFG
-
-FLOAT_PRECISION = MAIN_CFG["float_precision"]
+from alfredo_lib import FLOAT_PRECISION
 
 Base = declarative_base()
 

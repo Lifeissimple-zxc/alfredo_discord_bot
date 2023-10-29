@@ -9,6 +9,8 @@ ENV = "LOCAL" # TODO shold be coming from CLI args
 with open(file="config/main_config.yaml", encoding="utf-8") as _f:
     MAIN_CFG = yaml.safe_load(_f)
 
+FLOAT_PRECISION = MAIN_CFG["float_precision"]
+
 ERROR_MESSAGES = MAIN_CFG["error_messages"]
 
 with open(file=MAIN_CFG["user_input_schemas"], encoding="utf-8") as _f:

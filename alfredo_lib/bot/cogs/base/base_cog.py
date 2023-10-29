@@ -68,14 +68,19 @@ class CogHelper(commands.Cog):
                 await ctx.message.author.send(msg)
                 raise ex.InvalidUserInputError(msg)
         # Special handling & parsing
-        if key == "spreadsheet":
-            # TODO duplicate code here
-            data, e = self.ic.sheet_input_to_sheet_id(sheet_input=data)
-            if e is not None:
-                msg = f"{data} cannot be parsed to a sheet id: {e}"
-                await ctx.message.author.send(msg)
-                raise ex.InvalidUserInputError(msg)
-        return data
+        if (callable_name := MAIN_CFG["validation"].get(key, None)) is None:
+            bot_logger.debug("No validaton function in config for %s", key)
+            return data
+        if (val_m := getattr(self.ic, callable_name, None)) is None:
+            raise NotImplementedError(
+                f"{callable_name} validator for {key} is not implemented"
+            )
+        clean_data, e = val_m(data)
+        if e is not None:
+            msg = f"{data} did not pass validation by {callable_name}"
+            await ctx.message.author.send(msg)
+            raise ex.InvalidUserInputError(msg)
+        return clean_data
     
     async def _ask_user_for_data(
         self,

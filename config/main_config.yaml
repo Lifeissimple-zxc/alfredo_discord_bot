@@ -13,6 +13,9 @@ error_messages:
   admin_permission_needed: "{cmd} needs admin access. Can't execute!"
   bad_field_update: "{cmd} failed due to a bad field update attempt: {e}"
   bad_argument: "Invalid input for command {cmd}: {arg}"
+  missing_implementation: "{cmd} Failed because of server error: {e}"
+  unknown_command: "{cmd} is unknown to alfredo. Try !help or !start."
+  msg_reaction: "Commands start with '!'"
 
 messages:
   ong_transaction_exists: "Found an ongoing transaction. Data:\n {transaction}"
@@ -83,4 +86,9 @@ commands_metadata: "config/commands.yaml"
 cog_names:
   account: "account"
   transaction: "transaction"
-  category: "category"  
+  category: "category"
+
+validation:
+# Maps key to validator function to apply to it
+  spreadsheet: "sheet_input_to_sheet_id"
+  split_percent: "number_to_percent"

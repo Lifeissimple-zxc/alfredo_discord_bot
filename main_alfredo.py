@@ -96,11 +96,19 @@ def run_alfredo():
                 )
             elif isinstance(error.__cause__, ex.WrongUpdateFieldInputError):  # noqa: E501
                 bot_logger.debug(
-                    "%s attempted and incorrect field attempt for %s: %s",
+                    "%s provided an incorrect field attempt for %s: %s",
                     ctx.message.author.id, ctx.invoked_with, error.__cause__
                 )
                 await ctx.message.author.send(
                     MAIN_CFG["error_messages"]["bad_field_update"].format(
+                        cmd=ctx.invoked_with, e=error.__cause__
+                    )
+                )
+            elif isinstance(error.__cause__, ex.InvalidUserInputError):
+                bot_logger.debug("%s provided invalid input for %s: %s",
+                                 ctx.message.author.id, ctx.invoked_with, error.__cause__)
+                await ctx.message.author.send(
+                    MAIN_CFG["error_messages"]["bad_input"].format(
                         cmd=ctx.invoked_with, e=error.__cause__
                     )
                 )

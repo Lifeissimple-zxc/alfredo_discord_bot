@@ -30,3 +30,9 @@ class AdminPermissionNeededError(Exception):
     Custom exception for scenarios where non-admin calls and admin command
     """
     pass
+
+class InvalidUserInputError(Exception):
+    """
+    Indicates that a user's input did not pass validation
+    """
+    pass

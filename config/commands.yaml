@@ -115,4 +115,5 @@ show_guide:
     - "\tComplete user registration (!register)."
     - "\tShare spreadsheet with 'cr-bot228@cryptobot228.iam.gserviceaccount.com' so that alfredo could read / write data there."
     - "\tCreate a transaction (!tr)."
+    - "\tFormat your sheet for alfredo to paste transactions there (!ps)."
     - "\tSend transaction to  (!tts)."

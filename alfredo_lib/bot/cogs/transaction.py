@@ -53,7 +53,6 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
             return
         await ctx.author.send("No ongoing transactions located")
 
-
     @commands.command(name=COMMANDS_METADATA["get_transaction"]["name"],
                       aliases=COMMANDS_METADATA["get_transaction"]["aliases"],
                       help=COMMANDS_METADATA["get_transaction"]["help"])
@@ -80,14 +79,12 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         await ctx.author.send(
             f"Categories available: {json.dumps(obj=categories, indent=4)}"
         )
+        val_data = {"category_id": set(categories.keys())}
         tr_data = await self.get_input(
             ctx=ctx, command=command, model="transaction",
-            rec_discord_id=False, include_extra=True
+            rec_discord_id=False, include_extra=True,
+            val_data=val_data
         )
-
-        if (cat_id := tr_data["category_id"]) not in categories.keys():
-            await ctx.author.send(f"Category id {cat_id} is invalid")
-            return
         # Add extra metadata
         tr_data["user_id"] = user.user_id
         tr_data["currency"] = user.currency
@@ -270,7 +267,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         """
         Sends cached transaction to sheet and removes if from db on success
         """
-        self._transaction_to_sheet(ctx=ctx)
+        await self._transaction_to_sheet(ctx=ctx)
         
 
 

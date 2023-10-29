@@ -3,7 +3,7 @@ Module implements utility functions relied on by account and transaction cogs
 """
 import asyncio
 import logging
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 import discord
 import polars as pl
@@ -11,6 +11,7 @@ from discord.ext import commands
 
 from alfredo_lib import MAIN_CFG
 from alfredo_lib.alfredo_deps import cache, google_sheets_gateway, validator
+from alfredo_lib.bot import ex
 
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
 
@@ -37,12 +38,52 @@ class CogHelper(commands.Cog):
         """
         return msg.author == author and msg.channel == author.dm_channel
     
+    async def _fetch_one_key_data(self, ctx: commands.Context,
+                                  model: str, key: str, mode: str,
+                                  val_data: Optional[Dict[str, set]] = None):
+        """
+        Fetches data for a single input key from a user
+        """ 
+        if val_data is not None:
+            bot_logger.debug("val_data is provided")
+            val_set = val_data.get(key, None)
+            bot_logger.debug("val_set to be used for %s: %s",
+                             key, val_set)
+        resp = await self.bot.wait_for(
+            "message", check=lambda message: self.check_ctx(message, ctx.author),
+            timeout=MAIN_CFG["input_prompt_timeout"]
+        )
+        bot_logger.debug("Parsing %s...", key)
+        data, e = self.ic.parse_input(model=model, field=key,
+                                      data=resp.content)
+        if e is not None:
+            if mode == "base":
+                # 1 missing base field is a problem, raising exc to fast fail
+                msg = f"{key} cannot be parsed: {e}"
+                await ctx.message.author.send(msg)
+                raise ex.InvalidUserInputError(msg)
+        if val_set is not None:
+            if data not in val_set:
+                msg = f"Unexpected value {data} for {key}. Has to be one of {val_set}"
+                await ctx.message.author.send(msg)
+                raise ex.InvalidUserInputError(msg)
+        # Special handling & parsing
+        if key == "spreadsheet":
+            # TODO duplicate code here
+            data, e = self.ic.sheet_input_to_sheet_id(sheet_input=data)
+            if e is not None:
+                msg = f"{data} cannot be parsed to a sheet id: {e}"
+                await ctx.message.author.send(msg)
+                raise ex.InvalidUserInputError(msg)
+        return data
+    
     async def _ask_user_for_data(
         self,
         ctx: commands.Context,
         input_container: dict,
         model: str,
-        mode: Optional[str] = None
+        mode: Optional[str] = None,
+        val_data: Optional[Dict[str, set]] = None
     ) -> dict:
         """
         Prompts for data either using input_schemas[model][mode] of input_controller
@@ -53,57 +94,30 @@ class CogHelper(commands.Cog):
             bot_logger.error("Bad mode supplied: %s", mode)
             return {}
         # Making a copy not to do in-place modifications!
-        res = input_container.copy()
-
-        prompt_keys = self.ic.input_schemas[model][mode]
-        
-        for key in prompt_keys:
+        res = input_container.copy()        
+        for key in self.ic.input_schemas[model][mode]:
             await ctx.message.author.send(f"Please enter your {key}!")
-            
             try:
-                resp = await self.bot.wait_for(
-                    "message",
-                    check=lambda message: self.check_ctx(message, ctx.author),
-                    timeout=MAIN_CFG["input_prompt_timeout"]
-                )
-                data = resp.content
-                bot_logger.debug("Parsing %s...", key)
-                data, e = self.ic.parse_input(model=model,
-                                              field=key, data=data)
-                if e is not None:
-                    await ctx.message.author.send(f"{key} cannot be parsed: {e}")
-                    if mode == "base":
-                        # Returning bc 1 missing base field is a problem
-                        return res, None
-                    else:
-                        continue
-                # Special handling & parsing
-                if key == "spreadsheet":
-                    # TODO duplicate code here
-                    data, e = self.ic.sheet_input_to_sheet_id(sheet_input=data)
-                    if e is not None:
-                        await ctx.message.author.send(f"{key} cannot be parsed: {e}")
-                        return res, None
-
-
+                data = await self._fetch_one_key_data(ctx=ctx, model=model,
+                                                      key=key, mode=mode,
+                                                      val_data=val_data)
             except asyncio.TimeoutError as e:
                 await ctx.message.author.send(
                     MAIN_CFG["error_messages"]["prompt_timeout"]
                 )
                 return res, e
-
             res[key] = data
         return res, None
     
     async def get_input(self, ctx: commands.Context, command: str,
                         model: str, include_extra: Optional[bool] = None,
-                        rec_discord_id: Optional[bool] = None) -> dict:
+                        rec_discord_id: Optional[bool] = None,
+                        val_data: Optional[Dict[str, set]] = None) -> dict:
         """
-        ### Continuously prompts for user input.
-        Stores user responsed in a dict.
+        Continuously prompts for user input.
+        Stores user responses in a dict.
         :param rec_discord_id: True means auto adding a user's discord_id to the input 
         """
-
         if rec_discord_id is None:
             rec_discord_id = True
         if include_extra is None:
@@ -118,7 +132,7 @@ class CogHelper(commands.Cog):
         
         res, e = await self._ask_user_for_data(
             ctx=ctx, input_container=res,
-            mode="base", model=model
+            mode="base", model=model, val_data=val_data
         )
         # This happends due to timeout so returning no data makes sense???
         if e is not None:
@@ -126,7 +140,7 @@ class CogHelper(commands.Cog):
         if include_extra:
             res, e = await self._ask_user_for_data(
                 ctx=ctx, input_container=res,
-                mode="extra", model=model
+                mode="extra", model=model, val_data=val_data
             )
            
         bot_logger.debug("Collected data for command %s: %s", command, res)

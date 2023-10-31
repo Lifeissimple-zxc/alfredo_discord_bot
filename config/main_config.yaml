@@ -52,7 +52,7 @@ google_sheets:
     schema:
       # Keys need to match transaction table's columns in DB
       created:
-        sheet_name: "Created Unix Millsec"
+        sheet_name: "Created Timestamp"
         type: "Int64"
       username:
         sheet_name: "User"
@@ -73,6 +73,9 @@ google_sheets:
         sheet_name: "Split"
         type: "Float64"
     row_limit: 1000000
+    ts_conversion:
+      column: "created" # needs to match db
+      time_unit: "ms"
   hdr_index: 1
   sheet_id_parsing:
     id_len: 44

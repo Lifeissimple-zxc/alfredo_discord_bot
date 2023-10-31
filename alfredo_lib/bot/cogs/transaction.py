@@ -214,8 +214,10 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         df = self.lc.parse_db_row(row=transaction, mode=cache.ROW_PARSE_MODE_DF)
         rename_exp = [pl.col(key).alias(value["sheet_name"])
                       for key, value in sheet_schema.items()]
-        df = df.with_columns(rename_exp)
-        bot_logger.debug("Renamed columns for the sheet: %s", df)
+        df = df.with_columns(
+            (pl.from_epoch(**MAIN_CFG["google_sheets"]["transaction_tab"]["ts_conversion"])
+             .cast(pl.Utf8))).with_columns(rename_exp)
+        bot_logger.debug("Renamed columns for the sheet & converted ts: %s", df)
         df = df.select(
             [value["sheet_name"] for value in sheet_schema.values()]
         )

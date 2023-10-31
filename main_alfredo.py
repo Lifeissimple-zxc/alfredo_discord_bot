@@ -1,6 +1,7 @@
 """
 Module implements entry point to launching alfredo bot
 """
+import asyncio
 import logging
 import logging.config as log_config
 
@@ -66,16 +67,6 @@ def run_alfredo():
         except Exception as e:
             bot_logger.exception("Can't load CategoryCog: %s", e)
         bot_logger.debug("Loaded CategoryCog")
-
-    # TODO this does not work properly!, fix
-    @bot.event
-    async def on_message(message: discord.Message):
-        if message.author == bot.user:
-            return  # Ignore messages from the bot itself
-        if not message.content.startswith(MAIN_CFG["command_prefix"]):
-            await message.author.send(
-                MAIN_CFG["error_messages"]["msg_reaction"]
-            )
     
     @bot.event
     async def on_command_error(ctx: commands.Context, error: Exception):
@@ -89,6 +80,13 @@ def run_alfredo():
                 MAIN_CFG["error_messages"]["bad_argument"].format(
                     arg=arg, cmd=ctx.invoked_with
                 )
+            )
+        elif isinstance(error, commands.CommandNotFound):
+            bot_logger.error("%s invoked an unknown command: %s",
+                             ctx.message.author.id, ctx.invoked_with)
+            await ctx.message.author.send(
+                MAIN_CFG["error_messages"]["command_not_found"]
+                .format(cmd=ctx.invoked_with, e=error)
             )
         # All the raises inside the bot's body are wrapped with CommandInvokeError
         elif isinstance(error, commands.CommandInvokeError):
@@ -123,17 +121,16 @@ def run_alfredo():
                     )
                 )
             elif isinstance(error.__cause__, NotImplementedError):
-                bot_logger.error(error.__cause__)
+                bot_logger.debug(error.__cause__)
                 await ctx.message.author.send(
                     MAIN_CFG["error_messages"]["missing_implementation"].format(
                         cmd=ctx.invoked_with, e=error.__cause__
                     )
                 )
-            elif isinstance(error.__cause__, ex.UnknownCommandInvokedError):
-                bot_logger.error("%s invoked an unknown command: %s",
-                                 ctx.message.author.id, ctx.invoked_with)
+            elif isinstance(error.__cause__, asyncio.TimeoutError):
+                bot_logger.debug("%s timed out", ctx.invoked_with)
                 await ctx.message.author.send(
-                    MAIN_CFG["error_messages"]["missing_implementation"].format(
+                    MAIN_CFG["error_messages"]["prompt_timeout"].format(
                         cmd=ctx.invoked_with
                     )
                 )

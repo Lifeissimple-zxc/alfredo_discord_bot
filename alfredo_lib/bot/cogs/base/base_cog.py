@@ -107,10 +107,7 @@ class CogHelper(commands.Cog):
                                                       key=key, mode=mode,
                                                       val_data=val_data)
             except asyncio.TimeoutError as e:
-                await ctx.message.author.send(
-                    MAIN_CFG["error_messages"]["prompt_timeout"]
-                )
-                return res, e
+                raise e
             res[key] = data
         return res, None
     

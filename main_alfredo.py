@@ -70,6 +70,7 @@ def run_alfredo():
     
     @bot.event
     async def on_command_error(ctx: commands.Context, error: Exception):
+        bot_logger.debug("Got error: %s of type %s", error, type(error))
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.message.author.send(
                 MAIN_CFG["error_messages"]["missing_input"]
@@ -153,7 +154,12 @@ def run_alfredo():
             bot_logger.error(msg)
             await ctx.message.author.send(contet=msg)
 
-    @bot.command()
+    #TODO command metadata
+    @bot.command(
+        name=COMMANDS_METADATA["start"]["name"],
+        aliases=COMMANDS_METADATA["start"]["aliases"],
+        help=COMMANDS_METADATA["start"]["help"]
+    )
     async def start(ctx: commands.Context):
         account = buttons.AccountView(bot=bot, ctx=ctx)
         transaction = buttons.TransactionView(bot=bot, ctx=ctx)
@@ -171,7 +177,6 @@ def run_alfredo():
         bot_logger.debug("Registered user invoked start, showing transaction view")
         await ctx.message.author.send("Transaction commands:")
         await ctx.message.author.send(view=transaction)
-        
 
     # This is where the bot is actually launched
     bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)

@@ -49,6 +49,8 @@ class CogHelper(commands.Cog):
             val_set = val_data.get(key, None)
             bot_logger.debug("val_set to be used for %s: %s",
                              key, val_set)
+        else:
+            val_set = None
         resp = await self.bot.wait_for(
             "message", check=lambda message: self.check_ctx(message, ctx.author),
             timeout=MAIN_CFG["input_prompt_timeout"]
@@ -94,6 +96,7 @@ class CogHelper(commands.Cog):
         Prompts for data either using input_schemas[model][mode] of input_controller
         """
         # Quick mode check to avoid doing dowstream & save computation time
+        bot_logger.debug("About to ask user for data")
         mode = mode or "base"
         if mode not in ("base", "extra"):
             bot_logger.error("Bad mode supplied: %s", mode)

@@ -1,7 +1,7 @@
 """
 Module implements transaction-realted commands for alfredo
 """
-import json
+import asyncio
 import logging
 
 import polars as pl
@@ -10,7 +10,7 @@ from sqlalchemy import engine
 
 from alfredo_lib import COMMANDS_METADATA, MAIN_CFG
 from alfredo_lib.alfredo_deps import cache, google_sheets_gateway, validator
-from alfredo_lib.bot import ex
+from alfredo_lib.bot import buttons, ex
 from alfredo_lib.bot.cogs.base import base_cog
 from alfredo_lib.local_persistence import models
 
@@ -62,6 +62,46 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         """
         await self._get_transaction(ctx=ctx)
 
+    @staticmethod
+    async def __poll_on_view_id_input(view: buttons.TransactionCategoryView,
+                                      data_container: dict):
+        bot_logger.debug("Polling on input view provision")
+        while True:
+            if "category_id" in data_container:
+                bot_logger.debug("Input provided before timeout")
+                return
+            elif view.is_done and "category_id" not in data_container:
+                raise asyncio.TimeoutError
+            await asyncio.sleep(1)
+    
+    @staticmethod
+    def _category_data_to_category_view(categories: dict,
+                                        ctx: commands.Context,
+                                        data_container: dict) -> buttons.TransactionCategoryView:
+        view = buttons.TransactionCategoryView(timeout=MAIN_CFG["input_prompt_timeout"],
+                                               ctx=ctx)
+        bot_logger.debug("Instantiated view")
+        for cat_id, cat_name in categories.items():
+            view.add_item(
+                buttons.TransactionButton(
+                    label=cat_name,
+                    category_id=cat_id,
+                    data_container=data_container
+                )
+            )
+        bot_logger.debug("Added view buttons")
+        return view
+    
+    async def _collect_category_id(self, ctx: commands.Context, categories: dict,
+                                   data_container: dict):
+        """
+        Shows categories as buttons for users to select
+        """
+        view = self._category_data_to_category_view(categories=categories, ctx=ctx,
+                                                    data_container=data_container)
+        await ctx.message.author.send("Choose category", view=view)
+        await self.__poll_on_view_id_input(view=view, data_container=data_container)
+    
     async def _create_transaction(self, ctx: commands.Context,
                                   user: models.User, command: str):
         """
@@ -75,16 +115,14 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
                 f"Can't create transaction. No categories data in db: {e}"
             )
             return
-        
-        await ctx.author.send(
-            f"Categories available: {json.dumps(obj=categories, indent=4)}"
-        )
-        val_data = {"category_id": set(categories.keys())}
+        transaction = {}
+        await self._collect_category_id(ctx=ctx, categories=categories,
+                                        data_container=transaction)
         tr_data = await self.get_input(
             ctx=ctx, command=command, model="transaction",
-            rec_discord_id=False, include_extra=True,
-            val_data=val_data
+            rec_discord_id=False, include_extra=True
         )
+        tr_data = {**transaction, **tr_data}
         # Add extra metadata
         tr_data["user_id"] = user.user_id
         tr_data["currency"] = user.currency

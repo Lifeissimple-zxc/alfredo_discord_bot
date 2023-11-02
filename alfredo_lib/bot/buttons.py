@@ -1,12 +1,14 @@
 """
 Module implements UI buttons of the bot
 """
+import asyncio
 import functools
 import logging
-from typing import Callable
+from typing import Any, Callable, Coroutine, Optional
 
 import discord
 from discord.ext import commands
+from discord.interactions import Interaction
 
 from alfredo_lib import COMMANDS_METADATA, MAIN_CFG
 
@@ -136,6 +138,61 @@ class TransactionView(BaseView):
             await self.transaction_cog._transaction_to_sheet(ctx=self.ctx)
         except Exception as e:
             bot_logger.error("Error running button command: %s", e)
+
+
+class TransactionButton(discord.ui.Button):
+    """
+    Class implements a ui button used to transaction category
+    """
+    def __init__(self,
+                 label: str,
+                 category_id: int,
+                 data_container: dict,
+                 style: Optional[discord.ButtonStyle] = None):
+        """
+        Instantiates a button
+        """
+        if style is None:
+            style = discord.ButtonStyle.green
+        super().__init__(label=label, style=style)
+        self.category_id = category_id
+        self.data_container = data_container
+
+    async def callback(self, interaction: discord.interactions.Interaction):
+        """
+        Custom callback that records clicked category to the dict
+        """
+        await interaction.response.defer()
+        self.data_container["category_id"] = self.category_id
+        await interaction.followup.send(
+            f"You have chosen: {self.label}"
+        )
+        await interaction.edit_original_response(view=None)
+
+
+class TransactionCategoryView(discord.ui.View):
+    """
+    Class implements a custom view to use with instances of TransactionButton
+    """
+    def __init__(self, timeout: int, ctx: commands.Context):
+        """
+        Instantiates the class
+        """
+        super().__init__(timeout=timeout)
+        self.ctx = ctx
+        self.is_done = False
+
+    async def on_timeout(self):
+        """
+        Parent on_timeout override to flush buttons from the ui
+        """
+        bot_logger.debug("View timed out")
+        self.stop()
+        bot_logger.debug("Stopped view")
+        self.is_done = True
+
+     
+
 
 
     

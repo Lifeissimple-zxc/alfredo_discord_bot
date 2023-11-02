@@ -121,3 +121,6 @@ show_guide:
 # Not actually needed here except for validations
 start:
   name: "start"
+  aliases:
+    - "st"
+  help: "Start here if you are lost!"

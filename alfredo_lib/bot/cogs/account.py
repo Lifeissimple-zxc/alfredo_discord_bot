@@ -32,8 +32,8 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
         Actual register implementation
         """
         command = COMMANDS_METADATA["register"]["name"]
-        user, _ = self.lc.get_user(discord_id=ctx.author.id)
-        if user is not None:
+        _, e = self.lc.get_user(discord_id=ctx.author.id)
+        if e is None:
             await ctx.message.author.send("You are already registered")
             return
 

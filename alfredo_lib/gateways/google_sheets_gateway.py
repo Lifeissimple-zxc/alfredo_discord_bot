@@ -260,10 +260,11 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         ### Discovers sheets api service
         Outside of __init__ bc it needs an await
         """
-        self.sheet_service = await self.gsheet_client.discover(
-            api_name="sheets",
-            api_version=api_version
-        )
+        async with self.gsheet_client as client:
+            self.sheet_service = await client.discover(
+                api_name="sheets",
+                api_version=api_version
+            )
         bot_logger.debug("Performed %s sheets service discovery", api_version)
 
     
@@ -277,9 +278,10 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         Encorporates some basic retry logic.
         """
         try:
-            res = await self.gsheet_client.as_service_account(
-                req, timeout=timeout
-            )
+            async with self.gsheet_client as client:
+                res = await client.as_service_account(
+                    req, timeout=timeout
+                )
             return res
         except aiogoogle.excs.HTTPError as e:
             if 400 <= self._error_to_response_code(e=e) < 500:

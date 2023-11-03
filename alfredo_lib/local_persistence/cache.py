@@ -328,7 +328,7 @@ class UserCache(BaseCache):
         # Check for error
         if e is not None:
             user_msg = f"Failed to get user data: {e}"
-            bot_logger.error(user_msg)
+            bot_logger.debug(user_msg)
             return None, user_msg
         # Parse user data to dict
         bot_logger.debug("Got user data for %s", discord_id)

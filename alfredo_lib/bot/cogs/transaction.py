@@ -38,7 +38,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         # Check if caller discord id is in db
         user, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
-            raise ex.UserNotRegisteredError(msg=str(e))
+            raise ex.UserNotRegisteredError(str(e))
         try:
             transaction = self.lc.get_user_transactions(
                 user=user, parse_mode=cache.ROW_PARSE_MODE_STRING
@@ -142,7 +142,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         # Check if caller discord id is in db
         user, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
-            raise ex.UserNotRegisteredError(msg=str(e))
+            raise ex.UserNotRegisteredError(str(e))
         transaction = self.lc.get_user_transactions(
             user=user, parse_mode=cache.ROW_PARSE_MODE_STRING
         )
@@ -170,7 +170,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         # Check if caller discord id is in db
         user, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
-            raise ex.UserNotRegisteredError(msg=str(e))
+            raise ex.UserNotRegisteredError(str(e))
         # Get transaction as ORM obj
         transaction = self.lc.get_user_transactions(user=user)
         if not transaction:
@@ -212,7 +212,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         # Check if caller discord id is in db
         user, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
-            raise ex.UserNotRegisteredError(msg=str(e))
+            raise ex.UserNotRegisteredError(str(e))
         # Check if field is valid
         allowed_fields = self.ic.create_prompt_keys(model="transaction",
                                                     mode="all")
@@ -269,7 +269,7 @@ class TransactionCog(base_cog.CogHelper, name="transaction"):
         bot_logger.debug("Command invoked")
         user, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
-            raise ex.UserNotRegisteredError(msg=str(e))
+            raise ex.UserNotRegisteredError(str(e))
         transaction = self.lc.get_user_transactions(user=user)
         if not transaction:
             await ctx.author.send("No transactions located, can't send to sheet")

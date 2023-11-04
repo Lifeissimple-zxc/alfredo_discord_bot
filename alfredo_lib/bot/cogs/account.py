@@ -74,7 +74,7 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
                          ctx.author.id, COMMANDS_METADATA["prepare_sheet"]["name"])
         user_data, user_msg = self.lc.get_user(discord_id=ctx.author.id)
         if user_msg is not None:
-            raise ex.UserNotRegisteredError(msg=user_msg)
+            raise ex.UserNotRegisteredError(user_msg)
         sheet_id = user_data.spreadsheet
         bot_logger.debug("Preparing sheet %s for user %s",
                          sheet_id, ctx.author.id)
@@ -107,7 +107,7 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
             discord_id=ctx.author.id, parse_mode=cache.ROW_PARSE_MODE_STRING
         )
         if user_msg is not None:
-            raise ex.UserNotRegisteredError(msg=user_msg)
+            raise ex.UserNotRegisteredError(user_msg)
         await ctx.message.author.send(f"Your data:\n{user_data}")
 
     @commands.command(name=COMMANDS_METADATA["whoami"]["name"],
@@ -131,7 +131,7 @@ class AccountCog(base_cog.CogHelper, name=MAIN_CFG["cog_names"]["account"]):
         # Check for user's eligiblity to edit this
         _, e = self.lc.get_user(discord_id=ctx.author.id)
         if e is not None:
-            raise ex.UserNotRegisteredError(msg=str(e))
+            raise ex.UserNotRegisteredError(e)
         # Check if users are expected to update this field  
         if (field not in self.ic.create_prompt_keys(model="user", mode="all")
             and field is not None):

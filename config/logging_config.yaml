@@ -4,7 +4,7 @@ disable_existing_loggers: False
 
 formatters:
   main:
-    format: "[%(asctime)s - %(levelname)s - %(funcName)s()]\t %(message)s"
+    format: "[%(asctime)s - %(name)s - %(levelname)s - %(funcName)s()]\t %(message)s"
   test:
     format: "[%(asctime)s - %(filename)s - %(levelname)s - %(funcName)s()]\t %(message)s"
 
@@ -38,6 +38,7 @@ handlers:
       - "cfg://handlers.DiscordErrorHandler"
       - "cfg://handlers.DiscordHandler"
       - "cfg://handlers.DbHandler"
+      - "cfg://handlers.BackupFileHandler"
   DiscordErrorHandler:
     class: "alfredo_lib.alfredo_logger.DiscordHandler"
     filters:

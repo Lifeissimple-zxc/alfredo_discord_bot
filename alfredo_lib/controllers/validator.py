@@ -119,7 +119,7 @@ class InputController(InputValidator):
         Creates an instance of the validator class
         :param input_schemas: parsed yaml describing base and extra keys for data models
         """
-        super().__init__(input_schemas)
+        super().__init__(input_schemas=input_schemas)
         self.input_schemas = self._parse_input_schemas(input_schemas)
 
     @staticmethod

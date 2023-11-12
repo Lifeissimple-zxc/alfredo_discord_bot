@@ -10,7 +10,7 @@ from alfredo_lib.local_persistence import cache
 
 # Start with classes as further steps might be dependent on them
 local_cache = cache.Cache(MAIN_CFG["cache_path"]) # Referred by main & logging
-input_controller = validator.InputController(USER_INPUT_SCHEMAS)
+input_controller = validator.InputController(input_schemas=USER_INPUT_SCHEMAS)
 # Gsheet-related things
 read_limiter = async_rps_limiter.AsyncLimiter(
     **MAIN_CFG["google_sheets"]["rps"]["read"]

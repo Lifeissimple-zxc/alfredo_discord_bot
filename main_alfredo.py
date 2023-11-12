@@ -164,9 +164,13 @@ def run_alfredo():
         """
         Start menu entry point
         """
-        account = buttons.AccountView(bot=bot, ctx=ctx)
-        transaction = buttons.TransactionView(bot=bot, ctx=ctx)
-        start_menu = discord.ui.View()
+        account = buttons.AccountView(
+            bot=bot, ctx=ctx, timeout=MAIN_CFG["input_prompt_timeout"]
+        )
+        transaction = buttons.TransactionView(
+            bot=bot, ctx=ctx, timeout=MAIN_CFG["input_prompt_timeout"]
+        )
+        start_menu = discord.ui.View(timeout=MAIN_CFG["input_prompt_timeout"])
         acc_btn = buttons.StartButton(
             account_view=account, transaction_view=transaction,
             label=buttons.ACCOUNT_LABEL

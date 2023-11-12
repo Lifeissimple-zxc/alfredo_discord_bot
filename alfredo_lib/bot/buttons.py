@@ -34,13 +34,13 @@ class BaseView(discord.ui.View):
     """
     Class encompasses a base view for alfredo
     """
-    def __init__(self, bot: commands.Bot, ctx: commands.Context):
+    def __init__(self, bot: commands.Bot, ctx: commands.Context, timeout: int):
         "Instantiates the view"
         self.bot = bot
         self.ctx = ctx
         self.account_cog = self.bot.cogs[MAIN_CFG["cog_names"]["account"]]
         self.transaction_cog = self.bot.cogs[MAIN_CFG["cog_names"]["transaction"]]
-        super().__init__()
+        super().__init__(timeout=timeout)
 
 
 class AccountView(BaseView):

@@ -1,18 +1,20 @@
 """
 Module implements UI buttons of the bot
 """
-import asyncio
 import functools
 import logging
-from typing import Any, Callable, Coroutine, Optional
+from typing import Callable, Optional
 
 import discord
 from discord.ext import commands
-from discord.interactions import Interaction
 
 from alfredo_lib import COMMANDS_METADATA, MAIN_CFG
 
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
+
+
+ACCOUNT_LABEL = "Account"
+TRANSACTION_LABEL = "Transaction"
 
 
 def defer_decorator(interaction: discord.Interaction):
@@ -138,6 +140,44 @@ class TransactionView(BaseView):
             await self.transaction_cog._transaction_to_sheet(ctx=self.ctx)
         except Exception as e:
             bot_logger.error("Error running button command: %s", e)
+
+
+class StartButton(discord.ui.Button):
+    """
+    Class implements a ui button to navigate start menu
+    """
+    def __init__(self, account_view: AccountView,
+                 transaction_view: TransactionView,
+                 label: Optional[str] = None,
+                 style: Optional[discord.ButtonStyle] = None):
+        """
+        Instantiates a button
+        """
+        if style is None:
+            style = discord.ButtonStyle.blurple
+        if label is None:
+            label = ACCOUNT_LABEL
+        self.account_view = account_view
+        self.transaction_view= transaction_view
+        super().__init__(label=label, style=style)
+
+    async def callback(self, interaction: discord.interactions.Interaction):
+        """
+        Custom callback that sends transaction / account menu based on user input
+        """
+        await interaction.response.defer()
+        
+        if self.label == ACCOUNT_LABEL:
+            view_to_send = self.account_view
+        elif self.label == TRANSACTION_LABEL:
+            view_to_send = self.transaction_view
+        else:
+            bot_logger.error("Unexpected button label: %s", self.label)
+        
+        await interaction.followup.send(
+            view=view_to_send
+        )
+        await interaction.edit_original_response(view=None)
 
 
 class TransactionButton(discord.ui.Button):

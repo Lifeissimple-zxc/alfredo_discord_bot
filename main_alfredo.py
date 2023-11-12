@@ -161,22 +161,38 @@ def run_alfredo():
         help=COMMANDS_METADATA["start"]["help"]
     )
     async def start(ctx: commands.Context):
+        """
+        Start menu entry point
+        """
         account = buttons.AccountView(bot=bot, ctx=ctx)
         transaction = buttons.TransactionView(bot=bot, ctx=ctx)
-        await ctx.message.author.send("Account commands:")
-        await ctx.message.author.send(view=account)
+        start_menu = discord.ui.View()
+        acc_btn = buttons.StartButton(
+            account_view=account, transaction_view=transaction,
+            label=buttons.ACCOUNT_LABEL
+        )
+        start_menu.add_item(item=acc_btn)
+        bot_logger.debug("Prepared account menu button")
+        
         try:
             # Check if user is registered
-            _, e = bot.cogs[MAIN_CFG["cog_names"]["account"]].lc.get_user(discord_id=ctx.author.id)
+            _, e = (bot.cogs[MAIN_CFG["cog_names"]["account"]]
+                    .lc.get_user(discord_id=ctx.author.id))
             if e is not None:
                 bot_logger.debug("Unregistered user invoked start, showing account view only")
+                await ctx.message.author.send(view=start_menu)
                 return
         except Exception as e:
             bot_logger.error("Error checking registration command: %s", e)
             return
-        bot_logger.debug("Registered user invoked start, showing transaction view")
-        await ctx.message.author.send("Transaction commands:")
-        await ctx.message.author.send(view=transaction)
+        
+        bot_logger.debug("Registered user invoked start, adding transaction view to the menu")
+        tr_btn = buttons.StartButton(
+            account_view=account, transaction_view=transaction,
+            label=buttons.TRANSACTION_LABEL
+        )
+        start_menu.add_item(item=tr_btn)
+        await ctx.message.author.send(view=start_menu)
 
     # This is where the bot is actually launched
     bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)

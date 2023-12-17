@@ -29,7 +29,6 @@ def test_number_to_percent(user_input, allow_negative, want, want_err, test_name
         return
     assert err is None
     assert perc == want
-    assert 1 == 0
     
 
    

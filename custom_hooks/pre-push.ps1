@@ -5,6 +5,6 @@ python -m pytest -v
 if ($LastExitCode -eq 0) {
     echo "Tests passed!"
 } else {
-    echo "Tests failed :("
+    echo "Tests failed. Aborting push :("
     exit 1
 }

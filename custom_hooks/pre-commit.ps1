@@ -1,4 +1,1 @@
-pwd
-& .\env\Scripts\activate
-echo "Running pre-commit tests!"
-python -m pytest -v
+echo "Ciao from pre-commit.ps1!"

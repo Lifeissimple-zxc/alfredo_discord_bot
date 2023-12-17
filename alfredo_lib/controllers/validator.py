@@ -37,15 +37,16 @@ class InputValidator:
     @staticmethod
     def _convert_type(data: str, target_type: str):
         data = data.strip()
-        try:
-            if target_type == "str":
-                return data, None
-            elif target_type == "float":
-                return float(data), None
-            elif target_type == "int":
-                return int(data), None
-        except ValueError as e:
-            return None, e
+        if target_type == "str":
+            return data, None
+        elif target_type == "float":
+            return float(data), None
+        elif target_type == "int":
+            return int(float(data)), None
+        else:
+            return None, NotImplementedError(
+                f"{target_type} is not supported"
+            ) 
     
     def parse_input(self, model: str, field: str, data: str) -> tuple:
         """
@@ -94,7 +95,7 @@ class InputValidator:
             allow_negative = False
         
         num_val = round(user_input, FLOAT_PRECISION) 
-        if allow_negative and num_val < 0:
+        if not allow_negative and num_val < 0:
             return None, ValueError("Negative values are not allowed")
 
         if 0 < num_val <= 1:

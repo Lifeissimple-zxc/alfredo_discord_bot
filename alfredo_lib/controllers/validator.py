@@ -46,7 +46,7 @@ class InputValidator:
         else:
             return None, NotImplementedError(
                 f"{target_type} is not supported"
-            ) 
+            )
     
     def parse_input(self, model: str, field: str, data: str) -> tuple:
         """

@@ -4,7 +4,7 @@ Module implements entry point to launching alfredo bot
 import asyncio
 import logging
 import logging.config as log_config
-
+"bla"
 import discord
 import yaml
 from discord.ext import commands

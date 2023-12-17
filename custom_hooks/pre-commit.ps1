@@ -1,4 +1,4 @@
 pwd
 & .\env\Scripts\activate
-python --version
-echo "Ciao from pre-commit hook!"
+echo "Running pre-commit tests!"
+python -m pytest -v

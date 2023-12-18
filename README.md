@@ -33,4 +33,12 @@ Logic-wise, it can be summarized with the below chart:<br>![Alfredo Bot Logic TL
 
 Apart from the description above, the bot's code is the best way to understand how it works.
 
+#### Testing
+Tests for the project are writtend using `pytest` and `pytest-cov` libraries. Notes on commands useful for testing:
+
+- `python -m pytest -v {{path_to_tests}}` to run tests in verbose mode.
+- `python -m pytest --cov-report html --cov .` to generage a folder (`htmlcov`) showing coverage per module. Opening it via a server keeps it updated in realtime.
+
+---
+
 

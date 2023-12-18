@@ -29,3 +29,8 @@ logs/*
 
 # Ignoring contents of cache
 cache/**
+
+# Tests coverage
+coverage.*
+.coverage
+htmlcov/

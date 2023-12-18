@@ -7,6 +7,45 @@ from alfredo_lib.controllers import validator
 
 
 @pytest.mark.parametrize(
+    ("name", "input_schemas", "want"),
+    (
+        (
+            "Happy path, only base schema present",
+            {
+                "user": {"base": {"username": "str", "spreadsheet": "str"}}
+            },
+            {
+                "user": {"username": "str", "spreadsheet": "str"}
+            }
+        ),
+        (
+            "Happy path: base+extra and multiple models",
+            {
+                "user": {
+                    "base": {"username": "str", "spreadsheet": "str"},
+                    "extra": {"timezone": "str"}
+                },
+                "transaction": {
+                    "base": {"amount": "float"}, "extra": {"comment": "str"}
+                }
+            },
+            {
+                "user": {"username": "str", "spreadsheet": "str", "timezone": "str"},
+                "transaction": {"amount": "float", "comment": "str"}
+            }
+        ),
+        ("Empty schema",{},{})
+    )
+)
+def test_parse_types_schema(name, input_schemas, want):
+    "Tests _parse_types_schema of validator module"
+    got = validator.InputController._parse_types_schema(
+        input_schemas=input_schemas
+    )
+    assert got == want
+
+
+@pytest.mark.parametrize(
     ("name", "user_input", "allow_negative", "want", "err"),
     (
        ("Happy path, percentage input, no negatives", 1, False, 1, None),

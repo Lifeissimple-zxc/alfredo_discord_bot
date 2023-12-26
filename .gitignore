@@ -30,7 +30,8 @@ logs/*
 # Ignoring contents of cache
 cache/**
 
-# Tests coverage
+# Tests & Coverage
 coverage.*
 .coverage
 htmlcov/
+.pytest_cache/

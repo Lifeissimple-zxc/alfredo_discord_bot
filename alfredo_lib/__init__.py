@@ -1,9 +1,10 @@
 import dotenv
 import yaml
+import sys
 
 
 ENV_VARS = dotenv.dotenv_values(".env")
-ENV = "LOCAL" # TODO shold be coming from CLI args
+ENV = sys.argv[1] # TODO build a proper argprase module
 
 # Read main cfg
 with open(file="config/main_config.yaml", encoding="utf-8") as _f:

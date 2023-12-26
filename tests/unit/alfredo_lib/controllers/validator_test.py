@@ -59,6 +59,7 @@ def test_parse_types_schema(name, input_schemas, want, is_err):
     (
         ("Happy path for string", " bla ", "str", "bla", None),
         ("Happy path for float", " 0.75 ", "float", 0.75, None),
+        ("Happy path for float with a comma", " 10,12 ", "float", 10.12, None),
         ("Happy path for int", " 10 ", "int", 10, None),
         ("Unsupported target type", " 10 ", "float64", None, NotImplementedError("smth"))
     )

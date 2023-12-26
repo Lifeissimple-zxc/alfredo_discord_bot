@@ -9,7 +9,7 @@ import discord
 import yaml
 from discord.ext import commands
 
-from alfredo_lib import COMMANDS_METADATA, ENV_VARS, MAIN_CFG
+from alfredo_lib import COMMANDS_METADATA, ENV, ENV_VARS, MAIN_CFG
 from alfredo_lib.alfredo_deps import input_controller, local_cache, sheets
 from alfredo_lib.bot import buttons, ex
 from alfredo_lib.bot.cogs import account, category, transaction
@@ -199,7 +199,7 @@ def run_alfredo():
         await ctx.message.author.send(view=start_menu)
 
     # This is where the bot is actually launched
-    bot.run(ENV_VARS["DISCORD_APP_TOKEN"], root_logger=True)
+    bot.run(ENV_VARS[f"DISCORD_APP_TOKEN_{ENV}"], root_logger=True)
 
 
 if __name__ == "__main__":

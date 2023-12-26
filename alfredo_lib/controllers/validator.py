@@ -40,7 +40,7 @@ class InputValidator:
         if target_type == "str":
             return data, None
         elif target_type == "float":
-            return float(data), None
+            return float(data.replace(",", ".")), None
         elif target_type == "int":
             return int(float(data)), None
         else:

@@ -41,4 +41,8 @@ Tests for the project are writtend using `pytest` and `pytest-cov` libraries. No
 
 ---
 
+#### Running on Google VM
+
+`bash execute.sh &`
+
 

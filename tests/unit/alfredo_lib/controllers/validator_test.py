@@ -175,6 +175,74 @@ def test_number_to_percent(name, user_input, allow_negative, want, err):
     assert e is err
     assert got == want
 
+@pytest.mark.parametrize(
+    ("name", "input_schemas", "want", "err"),
+    (
+        (
+           "Happy path",
+           {
+               "user": {
+                    "base": {"username": "str", "spreadsheet": "str"},
+                    "extra": {"timezone": "str"}
+                },
+                "transaction": {
+                    "base": {"amount": "float"}, "extra": {"comment": "str"}
+                }
+           },
+           {
+                "user": {
+                    "base": {"username", "spreadsheet"}, "extra": {"timezone"}
+                },
+                "transaction": {"base": {"amount"}, "extra": {"comment"}}
+           },
+           None
+        ),
+        (
+           "Happy path, only base fields",
+           {
+               "user": {
+                    "base": {"username": "str", "spreadsheet": "str"},
+                },
+           },
+           {
+                "user": {"base": {"username", "spreadsheet"}, "extra": set()}
+           },
+           None
+        ),
+        (
+           "Error: no base fields provided",
+           {
+               "user": {
+                    "extra": {"username": "str", "spreadsheet": "str"},
+                },
+           },
+           None,
+           ValueError("smth")
+        ),
+    )   
+)
+def test_parse_input_schemas(name, input_schemas, want, err):
+    "Tests _parse_input_schemas from validator module"
+    ok_input_schemas = {
+        "user": {
+            "base": {"username": "str", "spreadsheet": "str"},
+            "extra": {"timezone": "str"}
+        },
+        "transaction": {
+            "base": {"amount": "float"}, "extra": {"comment": "str"}
+        }
+    }
+    ic = validator.InputController(input_schemas=ok_input_schemas)
+    if err is not None:
+        # TODO it's not DRY
+        with pytest.raises(type(err)):
+            ic._parse_input_schemas(input_schemas=input_schemas)
+        return
+    got = ic._parse_input_schemas(input_schemas=input_schemas)
+    assert got == want
+    
+
+
 
     
 

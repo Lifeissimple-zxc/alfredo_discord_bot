@@ -73,7 +73,7 @@ def test_convert_type(name, data, target_type, want, err):
         assert type(e) == type(err)
         assert got is want
         return
-    assert err is None
+    assert e is err
     assert got == want
 
 @pytest.mark.parametrize(
@@ -103,9 +103,52 @@ def test_parse_input(name, model, field, data, want, err):
         assert type(e) == type(err)
         assert got is want
         return
-    assert err is None
+    assert e is err
     assert got == want
 
+@pytest.mark.parametrize(
+    ("name", "user_input", "want", "err"),
+    (
+        (
+            "Happy path, url to sheet provided",
+            "https://docs.google.com/spreadsheets/d/1m12YbkXyt5yGv0jggVdEWYxCOZbJdVEhsWyCFe3Vi2c/edit#gid=0",
+            "1m12YbkXyt5yGv0jggVdEWYxCOZbJdVEhsWyCFe3Vi2c",
+            None
+        ),
+        (
+            "Happy path, sheet id provided",
+            "1m12YbkXyt5yGv0jggVdEWYxCOZbJdVEhsWyCFe3Vi2c",
+            "1m12YbkXyt5yGv0jggVdEWYxCOZbJdVEhsWyCFe3Vi2c",
+            None
+        ),
+        (
+            "Error: bad url input",
+            "https://docs.google.com/spreadsheets/1m12YbkXyt5yGv0jggVdEWYxCOZbJdVEhsWyCFe3Vi2c/edit#gid=0",
+            None,
+            ValueError("smth")
+        ),
+        (
+            "Error: bad id input", "somesheet", None, ValueError("smth")
+        )
+    )
+)
+def test_sheet_input_to_sheet_id(name, user_input, want, err):
+    "Tests sheet_input_to_sheet_id from validator module"
+    # replicating setup from main
+    sheet_id_len = 44
+    url_pattern = "docs.google.com\/spreadsheets"
+    id_pattern = "spreadsheets\/d\/(.+)\/"
+    got, e = validator.InputController.sheet_input_to_sheet_id(
+        user_input=user_input, url_pattern=url_pattern,
+        id_pattern=id_pattern, id_len=sheet_id_len
+    )
+    print("Results", got, e)
+    if err is not None:
+        assert type(e) == type(err)
+        assert want is got
+        return
+    assert e is err
+    assert got == want
 
 @pytest.mark.parametrize(
     ("name", "user_input", "allow_negative", "want", "err"),
@@ -129,7 +172,7 @@ def test_number_to_percent(name, user_input, allow_negative, want, err):
         assert type(e) == type(err)
         assert got is want
         return
-    assert err is None
+    assert e is err
     assert got == want
 
 

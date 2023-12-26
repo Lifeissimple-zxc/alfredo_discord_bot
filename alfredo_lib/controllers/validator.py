@@ -60,26 +60,34 @@ class InputValidator:
         return res, None
     
     @staticmethod
-    def sheet_input_to_sheet_id(user_input: str) -> None:
+    def sheet_input_to_sheet_id(user_input: str, url_pattern: Optional[str] = None,
+                                id_pattern: Optional[str] = None,
+                                id_len: Optional[int] = None) -> tuple:
         """
         Converts spreadsheet input provided by the user
         to a sheet id that alfredo can work with
         """
-        parsing_setup = MAIN_CFG["google_sheets"]["sheet_id_parsing"]
+        # This is coupled with MAIN_CFG bc in base_cog we dynamically define callable method
+        # Hence passing different args is not very convenient
+        if url_pattern is None:
+            url_pattern = MAIN_CFG["google_sheets"]["sheet_id_parsing"]["url_pattern"] # cannot be tested
+        if id_pattern is None:
+            id_pattern = MAIN_CFG["google_sheets"]["sheet_id_parsing"]["id_pattern"] # cannot be tested
+        if id_len is None:
+            id_len = MAIN_CFG["google_sheets"]["sheet_id_parsing"]["id_len"] # cannot be tested
+
         bot_logger.debug("Pasring sheet_input %s to id", user_input)
         sheet_id = user_input
 
-        if re.search(pattern=parsing_setup["url_pattern"],
-                     string=user_input):
+        if re.search(pattern=url_pattern, string=user_input):
             bot_logger.debug("User provided a url")
-            if not (sheet_id := re.search(pattern=parsing_setup["id_pattern"],
-                                    string=user_input)):
+            if not (sheet_id := re.search(pattern=id_pattern, string=user_input)):
                 return None, ValueError("Cannot parse url to sheet_id")
             bot_logger.debug("Fetched id from sheet input")
             sheet_id = sheet_id.group(1)
-        
-        if (id_len := len(sheet_id)) != parsing_setup["id_len"]:
-            msg = f"Invalid len {id_len} of sheet id in url. Value: {sheet_id}"
+
+        if (input_len := len(sheet_id)) != id_len:
+            msg = f"Invalid len {input_len} of sheet id in url. Value: {sheet_id}"
             bot_logger.error(msg)
             return None, ValueError(msg)
         

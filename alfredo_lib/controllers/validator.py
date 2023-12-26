@@ -39,8 +39,9 @@ class InputValidator:
         data = data.strip()
         if target_type == "str":
             return data, None
-        elif target_type == "float":
-            return float(data.replace(",", ".")), None
+        data = data.replace(",", ".")
+        if target_type == "float":
+            return float(data), None
         elif target_type == "int":
             return int(float(data)), None
         else:

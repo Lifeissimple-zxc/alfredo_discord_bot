@@ -9,7 +9,7 @@ import discord
 import yaml
 from discord.ext import commands
 
-from alfredo_lib import COMMANDS_METADATA, ENV, ENV_VARS, MAIN_CFG
+from alfredo_lib import COMMANDS_METADATA, ENV, ENV_VARS, LOG_LEVEL, MAIN_CFG
 from alfredo_lib.alfredo_deps import input_controller, local_cache, sheets
 from alfredo_lib.bot import buttons, ex
 from alfredo_lib.bot.cogs import account, category, transaction
@@ -22,6 +22,7 @@ with open(MAIN_CFG["logging_config"]) as _log_cfg:
 log_config.dictConfig(LOGGING_CONFIG)
 # Get loggers
 bot_logger = logging.getLogger(MAIN_CFG["main_logger_name"])
+bot_logger.setLevel(LOG_LEVEL)
 backup_logger = logging.getLogger(MAIN_CFG["backup_logger_name"])
 
 
@@ -199,7 +200,7 @@ def run_alfredo():
         await ctx.message.author.send(view=start_menu)
 
     # This is where the bot is actually launched
-    bot.run(ENV_VARS[f"DISCORD_APP_TOKEN_{ENV}"], root_logger=True)
+    bot.run(token=ENV_VARS[f"DISCORD_APP_TOKEN_{ENV}"], root_logger=True)
 
 
 if __name__ == "__main__":

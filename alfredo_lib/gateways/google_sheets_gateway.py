@@ -69,7 +69,7 @@ class GoogleSheetMapper:
         tab = sheet_tabs_data.get(tab_name, None)
         if tab is None:
             msg = f"No tab {tab_name} is sheet {sheet_id}"
-            bot_logger.debug("No tab %s is sheet %s", tab_name, sheet_id)
+            bot_logger.error("No tab %s is sheet %s", tab_name, sheet_id)
             return None, ValueError(msg)
         return tab["sheetId"], None
     
@@ -373,24 +373,24 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             return None, e
         # 2D array with rows here
         sheet_data = sheet_data["values"]
-        bot_logger.debug("Received data back: %s", sheet_data)
+        bot_logger.info("Received data back, len %s", len(sheet_data))
 
         header, data = self._process_sheet_response(sheet_data=sheet_data,
                                                     header_rownum=header_rownum,
                                                     header_offset=header_offset)
         bot_logger.debug("Accounted for header in sheet data")
         if not as_df:
-            bot_logger.debug("Returning as 2d list")
+            bot_logger.info("Returning as 2d list")
             return [header] + data, None
         
         # Converting to polars
-        bot_logger.debug("Converting to polars")
+        bot_logger.info("Converting to polars")
         df = pl.DataFrame(data=data)
         if len(df) > 0:
             df = df.transpose()
             df.columns = header
         if not use_schema:
-            bot_logger.debug("use_schema is False, returning untyped")
+            bot_logger.info("use_schema is False, returning untyped")
             return df, None
         # Typecasting TODO
 
@@ -471,7 +471,7 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
             sheet_range=sheet_range, data_update=data_update
         )
         # TODO refactor this a bit more!
-        bot_logger.debug("Pasting data to %s using range %s",
+        bot_logger.info("Pasting data to %s using range %s",
                          tab_name, paste_range)
         req = self.sheet_service.spreadsheets.values.update(
             spreadsheetId=sheet_id,
@@ -491,7 +491,6 @@ class GoogleSheetAsyncGateway(GoogleSheetMapper):
         """
         Computes number of rows to delete to comply with row_limit
         """
-        bot_logger.debug("Computing how many rows to drop")
         bot_logger.debug("current: %s, new: %s, limit %s",
                          current_len, new_len, row_limit)
         to_delete = 0

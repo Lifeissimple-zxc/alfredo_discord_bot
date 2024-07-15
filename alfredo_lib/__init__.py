@@ -7,7 +7,9 @@ import sys
 ENV_VARS = dotenv.dotenv_values(".env")
 ENV = sys.argv[1] # TODO build a proper argprase module
 
-LOG_LEVEL = logging._nameToLevel[ENV_VARS[f"LOG_LEVEL_{ENV}"]]
+LOG_LEVEL = logging.DEBUG
+if ENV in {"PROD", "LOCAL"}:
+    LOG_LEVEL = logging._nameToLevel[ENV_VARS[f"LOG_LEVEL_{ENV}"]]
 
 # Read main cfg
 with open(file="config/main_config.yaml", encoding="utf-8") as _f:
